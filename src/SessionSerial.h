@@ -31,7 +31,7 @@ class SessionSerial : public SessionAbstract {
 
  public:
   //  ValueSource<TcpCommand> command;
-  SessionSerial(Thread &thread, Config config);
+  SessionSerial(Thread &thread, JsonObject config);
   bool init();
   bool connect();
   bool disconnect();

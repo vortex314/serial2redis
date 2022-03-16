@@ -2,7 +2,6 @@
 #include <Log.h>
 #include <StringUtility.h>
 #include <stdio.h>
-#include <StringUtility.h>
 
 #include <thread>
 #include <unordered_map>
@@ -31,7 +30,7 @@ const char *CMD_TO_STRING[] = {"B_CONNECT",   "B_DISCONNECT", "B_SUBSCRIBER",
     exit(-1);          \
   }
 
-void loadConfig(JsonObject cfg,int argc, char **argv) {
+void loadConfig(JsonObject cfg, int argc, char **argv) {
   // defaults
   cfg["serial"]["port"] = "/dev/ttyUSB0";
   cfg["serial"]["baudrate"] = 115200;
@@ -71,15 +70,16 @@ void loadConfig(JsonObject cfg,int argc, char **argv) {
 //==========================================================================
 int main(int argc, char **argv) {
   INFO("Loading configuration.");
-  JsonDocument config = loadConfig(argc, argv);
+  JsonDocument config(10240);
+  loadConfig(config.as<JsonObject>(), argc, argv);
   Thread workerThread("worker");
-  Json serialConfig = config["serial"];
+  JsonObject serialConfig = config["serial"];
 
   string dstPrefix;
   string srcPrefix;
 
   SessionSerial serialSession(workerThread, config["serial"]);
-  Json brokerConfig = config["broker"];
+  JsonObject brokerConfig = config["broker"];
 
   INFO(" Launching Redis");
   BrokerRedis broker(workerThread, brokerConfig);
@@ -100,7 +100,6 @@ int main(int argc, char **argv) {
   };
 
   auto getAnyMsg = new SinkFunction<Bytes>([&](const Bytes &frame) {
-    CborReader cborReader(1000);
     int msgType;
     cborReader.fill(frame);
     if (cborReader.checkCrc()) {

@@ -214,7 +214,7 @@ int main(int argc, char **argv) {
 
   SessionUdp udpSession(workerThread, config["udp"]);
 
-  JsonObject brokerConfig = config["broker"];
+  JsonObject brokerConfig = config["redis"];
   BrokerRedis brokerProxy(workerThread, brokerConfig);
   std::map<UdpAddress, ClientProxy *> clients;
 
