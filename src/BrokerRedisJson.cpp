@@ -45,37 +45,36 @@ BrokerRedis::~BrokerRedis() {}
 //
 //=========================================================================
 //
+void addReply(JsonArray array,redisReply *reply){
+  switch( reply->type) {
+    case REDIS_REPLY_STRING : {
+      array.add(reply->str);
+      break;
+    };
+    case REDIS_REPLY_DOUBLE: {
+      array.add(reply->dval);
+      break;
+    }
+    case REDIS_REPLY_INTEGER: {
+      array.add(reply->integer);
+      break;
+    }
+    case REDIS_REPLY_ARRAY:{
+      auto nested = array.createNestedArray()
+      for(int i=0;i< reply->elements;i++)
+        addReply(nested,reply->element[i]);
+      break;
+    }
+  }
+}
+
 void BrokerRedis::onReply(redisAsyncContext *c, void *reply, void *me)
 {
   DynamicJsonDocument doc(10240);
   JsonArray array=doc.as<JsonArray>();
-  array.add("");
-  
-  //  INFO("%s",replyToString(reply).c_str());
-  BrokerRedis *pBroker = (BrokerRedis *)me;
-  if (reply == NULL)
-    return;
-  redisReply *r = (redisReply *)reply;
-  if (r->type == REDIS_REPLY_ARRAY)
-  {
-    if (strcmp(r->element[0]->str, "pmessage") == 0)
-    {
-      std::string topic = r->element[2]->str;
-      std::string payload = r->element[3]->str;
-      DynamicJsonDocument json(10240);
-      deserializeJson(json, payload);
-      json.shrinkToFit();
-      //      pBroker->_incoming.on({topic, json});
-    }
-    else
-    {
-      WARN("unexpected array %s ", r->element[0]->str);
-    }
-  }
-  else
-  {
-    WARN(" unexpected reply ");
-  }
+  addReply(array,reply);
+  doc.shrinkToFit();
+  pBroker->_incoming.on(doc);
 }
 //
 //=========================================================================
