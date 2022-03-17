@@ -34,7 +34,9 @@ class BrokerRedis {
   struct event_base *_publishEventBase;
   struct event_base *_subscribeEventBase;
   TimerSource _reconnectTimer;
-  static void onMessage(redisAsyncContext *c, void *reply, void *me);
+  static void onReply(redisAsyncContext *c, void *reply, void *me);
+    static void onPush(redisAsyncContext *c, void *reply, void *me);
+
   ValueFlow<bool> _reconnectHandler;
   std::string _srcPrefix;
   std::string _dstPrefix;

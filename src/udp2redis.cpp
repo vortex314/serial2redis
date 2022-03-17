@@ -146,6 +146,9 @@ class ClientProxy : public Actor {
         }
         case H("PSUBSCRIBE"): {
           _broker.subscribe(msg[1]);
+          _broker.request("PSUBSCRIBE %s",msg[1].c_str(),[](JsonArray reply){
+            
+          })
           break;
         }
         case H("HELLO"): {
