@@ -47,6 +47,10 @@ BrokerRedis::~BrokerRedis() {}
 //
 void addReply(JsonArray array,redisReply *reply){
   switch( reply->type) {
+    case REDIS_REPLY_STATUS: 
+    case REDIS_REPLY_ERR : 
+    case REDIS_REPLY_BIGNUM:
+    case REDIS_REPLY_VERB:
     case REDIS_REPLY_STRING : {
       array.add(reply->str);
       break;
@@ -59,6 +63,17 @@ void addReply(JsonArray array,redisReply *reply){
       array.add(reply->integer);
       break;
     }
+    case REDIS_REPLY_NIL: {
+      array.add(nullptr);
+      break;
+    }
+    case REDIS_REPLY_BOOL: {
+      array.add(reply->integer != 0);
+      break;
+    }
+    case REDIS_REPLY_MAP:
+    case REDIS_REPLY_SET:
+    case REDIS_REPLY_PUSH:
     case REDIS_REPLY_ARRAY:{
       auto nested = array.createNestedArray()
       for(int i=0;i< reply->elements;i++)

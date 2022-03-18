@@ -40,13 +40,13 @@ class BrokerRedis {
   ValueFlow<bool> _reconnectHandler;
   std::string _srcPrefix;
   std::string _dstPrefix;
-  QueueFlow<PubMsg> _incoming;
-  QueueFlow<PubMsg> _outgoing;
+  QueueFlow<JsonDocument> _incoming;
+  QueueFlow<JsonDocument> _outgoing;
 
  public:
   ValueFlow<bool> connected;
   ValueFlow<std::unordered_map<std::string, std::string>> stream;
-  Source<PubMsg> &incoming() { return _incoming; };
+  Source<JsonDocument> &incoming() { return _incoming; };
 
   BrokerRedis(Thread &, JsonObject);
   ~BrokerRedis();
@@ -63,6 +63,7 @@ class BrokerRedis {
   redisReply *xread(std::string key);
   int command(const char *format, ...);
   int request(std::string cmd, std::function<void(redisReply *)> func);
+  int request(JsonArray cmd,std::function<void(JsonArray )> func);
   int getId(std::string);
   int newRedisPublisher(std::string topic);
   std::vector<PubMsg> query(std::string);

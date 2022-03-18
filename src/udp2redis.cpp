@@ -136,16 +136,19 @@ class ClientProxy : public Actor {
                       std::string((const char *)frame.data(), frame.size()));
       JsonVariant m = msg.as<JsonVariant>();
   //    if (validate(m, "[x")) msgType = token(msg[0]);
-
+      
       switch (msgType) {
         case H("PUBLISH"): {
-          if (_broker.connected()) {
-            _broker.publish(msg[1], msg[2]);
-          }
+          DynamicJsonDocument doc(1024);
+          doc[0]="PUBLISH";
+          doc[1]=msg[1];
+          doc[2]=msg[2];
+          _broker.request(doc.as<JsonArray>(),[](JsonArray array){
+            // what to with response ? 
+          });
           break;
         }
         case H("PSUBSCRIBE"): {
-          _broker.subscribe(msg[1]);
           _broker.request("PSUBSCRIBE %s",msg[1].c_str(),[](JsonArray reply){
             
           })
