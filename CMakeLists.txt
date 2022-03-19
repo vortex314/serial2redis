@@ -27,7 +27,6 @@ target_sources(serial2redis PRIVATE
     src/config.cpp 
     src/SessionSerial.cpp
     src/serial.cpp 
-    src/BrokerRedisJson.cpp
     ${LIMERO}/linux/Log.cpp
     ${LIMERO}/linux/Sys.cpp
     ${LIMERO}/linux/limero.cpp
@@ -43,7 +42,6 @@ target_sources(udp2redis PRIVATE
     src/udp2redis.cpp 
     src/config.cpp 
     src/SessionUdp.cpp
-    src/BrokerRedisJson.cpp
     src/Udp.cpp 
     ${LIMERO}/linux/Log.cpp
     ${LIMERO}/linux/Sys.cpp

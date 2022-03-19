@@ -1,8 +1,8 @@
 #ifndef _BROKER_REDIS_H_
 #define _BROKER_DREDIS_H_
-#include <async.h>
 #include <ArduinoJson.h>
 #include <Log.h>
+#include <async.h>
 #include <broker_protocol.h>
 #include <hiredis.h>
 
@@ -10,7 +10,11 @@
 
 #include "limero.h"
 
+class BrokerRedis;
+
 typedef int (*SubscribeCallback)(int, std::string);
+typedef void (*AsyncCallback)(redisAsyncContext *c, redisReply *reply,
+                              BrokerRedis *me);
 
 struct PubMsg {
   String topic;
@@ -35,7 +39,7 @@ class BrokerRedis {
   struct event_base *_subscribeEventBase;
   TimerSource _reconnectTimer;
   static void onReply(redisAsyncContext *c, void *reply, void *me);
-    static void onPush(redisAsyncContext *c, void *reply, void *me);
+  static void onPush(redisAsyncContext *c, void *reply);
 
   ValueFlow<bool> _reconnectHandler;
   std::string _srcPrefix;
@@ -61,9 +65,9 @@ class BrokerRedis {
   int subscribeAll();
   bool match(std::string pattern, std::string source);
   redisReply *xread(std::string key);
-  int command(const char *format, ...);
+  int command(AsyncCallback, const char *format, ...);
   int request(std::string cmd, std::function<void(redisReply *)> func);
-  int request(JsonArray cmd,std::function<void(JsonArray )> func);
+  int request(JsonArray cmd, std::function<void(JsonArray)> func);
   int getId(std::string);
   int newRedisPublisher(std::string topic);
   std::vector<PubMsg> query(std::string);
@@ -75,8 +79,8 @@ class BrokerRedis {
     if (topic.rfind("src/", 0) == 0 || topic.rfind("dst/", 0) == 0)
       absTopic = topic;
     SinkFunction<T> *sf = new SinkFunction<T>([&, absTopic](const T &t) {
-      JsonVariant json = t;
-      _outgoing.on({absTopic, json});
+      JsonDocument json = t;
+      _outgoing.on(json);
     });
     return *sf;
   }

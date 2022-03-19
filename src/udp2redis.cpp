@@ -1,12 +1,13 @@
 
 #include <ArduinoJson.h>
-#include <BrokerRedisJson.h>
 #include <Fnv.h>
 #include <Frame.h>
 #include <Log.h>
 #include <SessionUdp.h>
 #include <StringUtility.h>
 #include <Udp.h>
+#include <async.h>
+#include <hiredis.h>
 #include <stdio.h>
 
 #include <map>
@@ -102,28 +103,94 @@ int token(JsonVariant v) {
   return -1;
 }
 
+void addReply(JsonArray array, redisReply *reply) {
+  switch (reply->type) {
+    case REDIS_REPLY_STATUS:
+    case REDIS_REPLY_ERROR:
+    case REDIS_REPLY_BIGNUM:
+    case REDIS_REPLY_VERB:
+    case REDIS_REPLY_STRING: {
+      array.add(reply->str);
+      break;
+    };
+    case REDIS_REPLY_DOUBLE: {
+      array.add(reply->dval);
+      break;
+    }
+    case REDIS_REPLY_INTEGER: {
+      array.add(reply->integer);
+      break;
+    }
+    case REDIS_REPLY_NIL: {
+      array.add(nullptr);
+      break;
+    }
+    case REDIS_REPLY_BOOL: {
+      array.add(reply->integer != 0);
+      break;
+    }
+    case REDIS_REPLY_MAP:
+    case REDIS_REPLY_SET:
+    case REDIS_REPLY_PUSH:
+    case REDIS_REPLY_ARRAY: {
+      auto nested = array.createNestedArray();
+      for (int i = 0; i < reply->elements; i++)
+        addReply(nested, reply->element[i]);
+      break;
+    }
+  }
+}
+
 //================================================================
 
 class ClientProxy : public Actor {
-  BrokerRedis _broker;
   UdpAddress _sourceAddress;
   QueueFlow<Bytes> _incoming;
   QueueFlow<Bytes> _outgoing;
   String nodeName;
+  redisAsyncContext *_ac;
+  std::string _node;
+  bool _connected;
+  std::string _redisHost;
+  uint16_t _redisPort;
 
  public:
   ClientProxy(Thread &thread, JsonObject config, UdpAddress source)
       : Actor(thread),
-        _broker(thread, config),
         _sourceAddress(source),
         _incoming(10, "incoming"),
         _outgoing(5, "outgoing") {
     INFO(" created clientProxy %s ", _sourceAddress.toString().c_str());
     _incoming.async(thread);
     _outgoing.async(thread);
+    _redisHost = config["host"] | "localhost";
+    _redisPort = config["port"] | 6379;
   };
+
+  static void onPush(redisAsyncContext *c, void *reply) {}
+
+  int connect() {
+    INFO("Connecting to Redis %s:%d as '%s'.", _redisHost.c_str(), _redisPort,
+         _node.c_str());
+    _ac = redisAsyncConnect(Sys::hostname(), 6379);
+
+    if (_ac == NULL || _ac->err) {
+      INFO(" Connection %s:%d failed", _redisHost.c_str(), _redisPort);
+      return ENOTCONN;
+    }
+    redisAsyncSetPushCallback(_ac, onPush);
+
+    int rc = redisAsyncSetDisconnectCallback(
+        _ac, [](const redisAsyncContext *c, int status) {
+          WARN("REDIS disconnected : %d", status);
+        });
+
+    thread().addReadInvoker(_ac->c.fd, [&](int) { redisAsyncHandleRead(_ac); });
+    thread().addWriteInvoker(_ac->c.fd,
+                             [&](int) { redisAsyncHandleWrite(_ac); });
+    _connected = true;
+  }
   void init() {
-    _broker.init();
     /*  _incoming >> [&](const Bytes &bs) {
         INFO(" %s client rxd %s ", _sourceAddress.toString().c_str(),
              hexDump(bs).c_str());
@@ -135,33 +202,48 @@ class ClientProxy : public Actor {
       deserializeJson(msg,
                       std::string((const char *)frame.data(), frame.size()));
       JsonVariant m = msg.as<JsonVariant>();
-  //    if (validate(m, "[x")) msgType = token(msg[0]);
-      
+      //    if (validate(m, "[x")) msgType = token(msg[0]);
+
       switch (msgType) {
         case H("PUBLISH"): {
           DynamicJsonDocument doc(1024);
-          doc[0]="PUBLISH";
-          doc[1]=msg[1];
-          doc[2]=msg[2];
-          _broker.request(doc.as<JsonArray>(),[](JsonArray array){
-            // what to with response ? 
-          });
+          std::string str;
+          doc.set(msg[2]);
+          serializeJson(doc, str);
+          redisAsyncCommand(
+              _ac,
+              [](redisAsyncContext *c, void *reply, void *me) {
+                DynamicJsonDocument doc(10240);
+                addReply(doc.as<JsonArray>(), (redisReply *)reply);
+              },
+              this, "PUBLISH %s %s", msg[1].as<const char *>(), str.c_str());
+
           break;
         }
         case H("PSUBSCRIBE"): {
-          _broker.request("PSUBSCRIBE %s",msg[1].c_str(),[](JsonArray reply){
-            
-          })
+          DynamicJsonDocument doc(1024);
+          std::string str;
+          doc.set(msg[1]);
+          serializeJson(doc, str);
+          redisAsyncCommand(
+              _ac,
+              [](redisAsyncContext *c, void *reply, void *me) {
+                DynamicJsonDocument doc(10240);
+                addReply(doc.as<JsonArray>(), (redisReply *)reply);
+              },
+              this, "PSUBSCRIBE %s %s", msg[1].as<const char *>(), str.c_str());
           break;
         }
         case H("HELLO"): {
-          validate(msg[1], "s");
-          std::string nodeName = msg[1];
-          _broker.connect(nodeName);
-          String topic = "dst/";
-          topic += nodeName;
-          topic += "/*";
-          _broker.subscribe(topic);
+          DynamicJsonDocument doc(1024);
+          redisAsyncCommand(
+              _ac,
+              [](redisAsyncContext *c, void *reply, void *me) {
+                DynamicJsonDocument doc(10240);
+                addReply(doc.as<JsonArray>(), (redisReply *)reply);
+              },
+              this, "HELLO");
+          break;
           break;
         }
       }
@@ -169,13 +251,15 @@ class ClientProxy : public Actor {
 
     _incoming >> getAnyMsg;
 
-    SinkFunction<String> redisLogStream([&](const String &bs) {
-      static String buffer;
+    SinkFunction<std::string> redisLogStream([&](const std::string &bs) {
+      static std::string buffer;
       for (uint8_t b : bs) {
         if (b == '\n') {
           printf("%s%s%s\n", ColorOrange, buffer.c_str(), ColorDefault);
-          _broker.command("XADD logs * node %s message %s ", nodeName.c_str(),
-                          buffer.c_str());
+          redisAsyncCommand(
+              _ac, [](redisAsyncContext *ac, void *reply, void *me) {}, this,
+              "XADD logs * node %s message %s ", nodeName.c_str(),
+              buffer.c_str());
           buffer.clear();
         } else if (b == '\r') {  // drop
         } else {
@@ -183,27 +267,6 @@ class ClientProxy : public Actor {
         }
       }
     });
-
-    // serialSession.logs() >> redisLogStream;
-
-    /*
-          ::write(1, ColorOrange, strlen(ColorOrange));
-        ::write(1, bs.data(), bs.size());
-        ::write(1, ColorDefault, strlen(ColorDefault));
-    */
-    _broker.incoming() >>
-        new LambdaFlow<PubMsg, Bytes>([&](Bytes &msg, const PubMsg &pub) {
-          DynamicJsonDocument out(10240);
-          std::string js;
-          out[0] = H("PUBLISH");
-          out[1] = pub.payload;
-          serializeJson(out, js);
-          js += "CRC";
-
-          msg = Bytes(js.begin(), js.end());
-          return true;
-        }) >>
-        _outgoing;
   }
   Sink<Bytes> &incoming() { return _incoming; }
   Source<Bytes> &outgoing() { return _outgoing; }
@@ -221,25 +284,22 @@ int main(int argc, char **argv) {
   SessionUdp udpSession(workerThread, config["udp"]);
 
   JsonObject brokerConfig = config["redis"];
-  BrokerRedis brokerProxy(workerThread, brokerConfig);
   std::map<UdpAddress, ClientProxy *> clients;
 
   udpSession.init();
   udpSession.connect();
-  brokerProxy.init();
-  brokerProxy.connect("udp-proxy");
   UdpAddress serverAddress;
   UdpAddress::fromUri(serverAddress, "0.0.0.0:9999");
   INFO("%s", serverAddress.toString().c_str());
 
   udpSession.recv() >> [&](const UdpMsg &udpMsg) {
-    //   INFO(" UDP RXD %s => %s ", udpMsg.src.toString().c_str(),
-    //        udpMsg.dst.toString().c_str());
-    UdpAddress src = udpMsg.src;
+    INFO(" UDP RXD %s => %s ", udpMsg.src.toString().c_str(),
+         udpMsg.dst.toString().c_str());
+    UdpAddress udpSource = udpMsg.src;
     ClientProxy *clientProxy;
-    auto it = clients.find(src);
+    auto it = clients.find(udpSource);
     if (it == clients.end()) {
-      clientProxy = new ClientProxy(workerThread, brokerConfig, src);
+      clientProxy = new ClientProxy(workerThread, brokerConfig, udpSource);
       clientProxy->init();
       clientProxy->outgoing() >> [&, clientProxy](const Bytes &bs) {
         UdpMsg msg;
@@ -252,7 +312,7 @@ int main(int argc, char **argv) {
                  .c_str());
         udpSession.send().on(msg);
       };
-      clients.emplace(src, clientProxy);
+      clients.emplace(udpSource, clientProxy);
     } else {
       clientProxy = it->second;
     }

@@ -1,5 +1,6 @@
 #include <SessionUdp.h>
 #include <ppp_frame.h>
+#include <StringUtility.h>
 
 SessionUdp::SessionUdp(Thread &thread, JsonObject config)
     : SessionAbstract(thread, config),
@@ -7,13 +8,11 @@ SessionUdp::SessionUdp(Thread &thread, JsonObject config)
       _outgoingMessage(10, "_outgoingMessage"),
       _send(10, "send"),
       _recv(10, "recv") {
-        _recv.async(thread);
-        _send.async(thread);
+  _recv.async(thread);
+  _send.async(thread);
   _errorInvoker = new UdpSessionError(*this);
   _port = config["port"].as<uint32_t>();
-  _send >> [&](const UdpMsg& um){
-    _udp.send(um);
-  };
+  _send >> [&](const UdpMsg &um) { _udp.send(um); };
 }
 
 bool SessionUdp::init() {
@@ -38,14 +37,14 @@ bool SessionUdp::disconnect() {
 void SessionUdp::invoke() {
   int rc = _udp.receive(_udpMsg);
   if (rc == 0) {  // read ok
- /*   INFO("UDP RXD %s => %s ", _udpMsg.src.toString().c_str(),
-         hexDump(_udpMsg.message).c_str());*/
+    INFO("UDP RXD %s => %s ", _udpMsg.src.toString().c_str(),
+         hexDump(_udpMsg.message).c_str());
     _recv.on(_udpMsg);
   }
 }
 // on error issue on file descriptor
 void SessionUdp::onError() {
-  WARN(" Error occured on SessionUdp. Disconnecting.. " );
+  WARN(" Error occured on SessionUdp. Disconnecting.. ");
   disconnect();
 }
 
