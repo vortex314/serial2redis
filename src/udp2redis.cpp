@@ -145,8 +145,8 @@ void addReply(JsonArray array, redisReply *reply) {
 
 class ClientProxy : public Actor {
   UdpAddress _sourceAddress;
-  QueueFlow<Bytes> _incoming;
-  QueueFlow<Bytes> _outgoing;
+  QueueFlow<std::string> _incoming;
+  QueueFlow<std::string> _outgoing;
   String nodeName;
   redisAsyncContext *_ac;
   std::string _node;
@@ -167,17 +167,31 @@ class ClientProxy : public Actor {
     _redisPort = config["port"] | 6379;
   };
 
-  static void onPush(redisAsyncContext *c, void *reply) {}
+  static void onPush(redisAsyncContext *c, void *reply) {
+    INFO(" PUSH received ");
+  }
+
+  static void free_privdata(void *pvdata) {}
 
   int connect() {
     INFO("Connecting to Redis %s:%d as '%s'.", _redisHost.c_str(), _redisPort,
          _node.c_str());
+    redisOptions options = {0};
+    REDIS_OPTIONS_SET_TCP(&options, _redisHost.c_str(), _redisPort);
+    options.connect_timeout = new timeval{3, 0};  // 3 sec
+    options.command_timeout = new timeval{3, 0};  // 3 sec
+    REDIS_OPTIONS_SET_PRIVDATA(&options, this, free_privdata);
+    //    redisAsyncInitialize()
     _ac = redisAsyncConnect(Sys::hostname(), 6379);
 
     if (_ac == NULL || _ac->err) {
       INFO(" Connection %s:%d failed", _redisHost.c_str(), _redisPort);
       return ENOTCONN;
     }
+    redisAsyncSetConnectCallback(_ac,
+                                 [](const redisAsyncContext *c, int status) {
+                                   WARN("REDIS connected : %d", status);
+                                 });
     redisAsyncSetPushCallback(_ac, onPush);
 
     int rc = redisAsyncSetDisconnectCallback(
@@ -185,69 +199,81 @@ class ClientProxy : public Actor {
           WARN("REDIS disconnected : %d", status);
         });
 
-    thread().addReadInvoker(_ac->c.fd, [&](int) { redisAsyncHandleRead(_ac); });
-    thread().addWriteInvoker(_ac->c.fd,
-                             [&](int) { redisAsyncHandleWrite(_ac); });
+    thread().addErrorInvoker(_ac->c.fd, [&](int) { WARN(" error on fd "); });
+    thread().addReadInvoker(_ac->c.fd, [&](int) {
+      INFO("read invoker");
+      redisAsyncHandleRead(_ac);
+    });
+    thread().addWriteInvoker(_ac->c.fd, [&](int) {
+      INFO("write invoker");
+      redisAsyncHandleWrite(_ac);
+    });
     _connected = true;
+    return 0;
+  }
+
+  static void replyHandler(redisAsyncContext *c, void *reply, void *me) {
+    ClientProxy *proxy = (ClientProxy *)me;
+    DynamicJsonDocument doc(10240);
+    JsonArray array = doc.to<JsonArray>();
+    addReply(array, (redisReply *)reply);
+    std::string resp;
+    serializeJson(doc, resp);
+    INFO(" reply %s ", resp.c_str());
+    proxy->_outgoing.on(resp);
   }
   void init() {
-    /*  _incoming >> [&](const Bytes &bs) {
+    /*  _incoming >> [&](const std::string &bs) {
         INFO(" %s client rxd %s ", _sourceAddress.toString().c_str(),
              hexDump(bs).c_str());
       };*/
 
-    auto getAnyMsg = new SinkFunction<Bytes>([&](const Bytes &frame) {
-      int msgType;
-      DynamicJsonDocument msg(10240);
-      deserializeJson(msg,
-                      std::string((const char *)frame.data(), frame.size()));
-      JsonVariant m = msg.as<JsonVariant>();
-      //    if (validate(m, "[x")) msgType = token(msg[0]);
-
-      switch (msgType) {
-        case H("PUBLISH"): {
-          DynamicJsonDocument doc(1024);
-          std::string str;
-          doc.set(msg[2]);
-          serializeJson(doc, str);
-          redisAsyncCommand(
-              _ac,
-              [](redisAsyncContext *c, void *reply, void *me) {
-                DynamicJsonDocument doc(10240);
-                addReply(doc.as<JsonArray>(), (redisReply *)reply);
-              },
-              this, "PUBLISH %s %s", msg[1].as<const char *>(), str.c_str());
-
-          break;
-        }
-        case H("PSUBSCRIBE"): {
-          DynamicJsonDocument doc(1024);
-          std::string str;
-          doc.set(msg[1]);
-          serializeJson(doc, str);
-          redisAsyncCommand(
-              _ac,
-              [](redisAsyncContext *c, void *reply, void *me) {
-                DynamicJsonDocument doc(10240);
-                addReply(doc.as<JsonArray>(), (redisReply *)reply);
-              },
-              this, "PSUBSCRIBE %s %s", msg[1].as<const char *>(), str.c_str());
-          break;
-        }
-        case H("HELLO"): {
-          DynamicJsonDocument doc(1024);
-          redisAsyncCommand(
-              _ac,
-              [](redisAsyncContext *c, void *reply, void *me) {
-                DynamicJsonDocument doc(10240);
-                addReply(doc.as<JsonArray>(), (redisReply *)reply);
-              },
-              this, "HELLO");
-          break;
-          break;
-        }
-      }
-    });
+    auto getAnyMsg =
+        new SinkFunction<std::string>([&](const std::string &frame) {
+          INFO("%s", frame.c_str());
+          int msgType;
+          DynamicJsonDocument docIn(10240);
+          std::string str((const char *)frame.data(), frame.size());
+          auto rc = deserializeJson(docIn, str);
+          if (rc != DeserializationError::Ok &&
+              (validate(docIn.as<JsonVariant>(), "[s") ||
+               validate(docIn.as<JsonVariant>(), "[n"))) {
+            WARN(" deserialization fails :'%s'", str.c_str());
+            return;
+          }
+          msgType = token(docIn[0]);
+          switch (msgType) {
+            case H("PUBLISH"): {
+              DynamicJsonDocument doc(1024);
+              std::string str;
+              doc.set(docIn[2]);
+              serializeJson(doc, str);
+              redisAsyncCommand(_ac, replyHandler, this, "PUBLISH %s %s",
+                                docIn[1].as<const char *>(), str.c_str());
+              redisAsyncWrite(_ac);
+              break;
+            }
+            case H("PSUBSCRIBE"): {
+              DynamicJsonDocument doc(1024);
+              std::string str;
+              doc.set(docIn[1]);
+              serializeJson(doc, str);
+              redisAsyncCommand(_ac, replyHandler, this, "PSUBSCRIBE %s %s",
+                                docIn[1].as<const char *>(), str.c_str());
+              redisAsyncWrite(_ac);
+              break;
+            }
+            case H("HELLO"): {
+              redisAsyncCommand(_ac, replyHandler, this, "HELLO");
+              redisAsyncWrite(_ac);
+              break;
+            }
+            default: {
+              INFO("unknown message type ");
+              break;
+            }
+          }
+        });
 
     _incoming >> getAnyMsg;
 
@@ -268,8 +294,8 @@ class ClientProxy : public Actor {
       }
     });
   }
-  Sink<Bytes> &incoming() { return _incoming; }
-  Source<Bytes> &outgoing() { return _outgoing; }
+  Sink<std::string> &incoming() { return _incoming; }
+  Source<std::string> &outgoing() { return _outgoing; }
   UdpAddress src() { return _sourceAddress; }
 };
 
@@ -301,9 +327,9 @@ int main(int argc, char **argv) {
     if (it == clients.end()) {
       clientProxy = new ClientProxy(workerThread, brokerConfig, udpSource);
       clientProxy->init();
-      clientProxy->outgoing() >> [&, clientProxy](const Bytes &bs) {
+      clientProxy->outgoing() >> [&, clientProxy](const std::string &bs) {
         UdpMsg msg;
-        msg.message = bs;
+        msg.message = std::vector<uint8_t>(bs.data(), bs.data() + bs.size());
         msg.dst = clientProxy->src();
         msg.src = serverAddress;
         INFO("TXD UDP %s=>%s:%s ", msg.src.toString().c_str(),
@@ -313,10 +339,12 @@ int main(int argc, char **argv) {
         udpSession.send().on(msg);
       };
       clients.emplace(udpSource, clientProxy);
+      clientProxy->connect();
     } else {
       clientProxy = it->second;
     }
-    clientProxy->incoming().on(udpMsg.message);
+    clientProxy->incoming().on(std::string((const char *)udpMsg.message.data(),
+                                           udpMsg.message.size()));
     // create new instance for broker connection
     // connect instrance to UdpMsg Stream
   };
