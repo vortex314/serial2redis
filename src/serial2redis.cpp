@@ -1,34 +1,21 @@
 #include <ArduinoJson.h>
+#include <Common.h>
+#include <Frame.h>
 #include <Log.h>
+#include <Redis.h>
+#include <SessionSerial.h>
 #include <StringUtility.h>
+#include <async.h>
+#include <broker_protocol.h>
+#include <hiredis.h>
+#include <limero.h>
 #include <stdio.h>
 
 #include <thread>
 #include <unordered_map>
 #include <utility>
 
-using namespace std;
-
 Log logger;
-
-#include <Frame.h>
-#include <SessionSerial.h>
-#include <broker_protocol.h>
-
-#include "BrokerRedisJson.h"
-const int MsgPublish::TYPE;
-
-//====================================================
-
-const char *CMD_TO_STRING[] = {"B_CONNECT",   "B_DISCONNECT", "B_SUBSCRIBER",
-                               "B_PUBLISHER", "B_PUBLISH",    "B_RESOURCE",
-                               "B_QUERY"};
-
-#define fatal(message) \
-  {                    \
-    WARN(message);     \
-    exit(-1);          \
-  }
 
 void loadConfig(JsonObject cfg, int argc, char **argv) {
   // defaults
@@ -70,100 +57,48 @@ void loadConfig(JsonObject cfg, int argc, char **argv) {
 //==========================================================================
 int main(int argc, char **argv) {
   INFO("Loading configuration.");
-  JsonDocument config(10240);
+  DynamicJsonDocument config(10240);
   loadConfig(config.as<JsonObject>(), argc, argv);
   Thread workerThread("worker");
+
   JsonObject serialConfig = config["serial"];
-
-  string dstPrefix;
-  string srcPrefix;
-
   SessionSerial serialSession(workerThread, config["serial"]);
-  JsonObject brokerConfig = config["broker"];
 
-  INFO(" Launching Redis");
-  BrokerRedis broker(workerThread, brokerConfig);
-  BrokerRedis brokerProxy(workerThread, brokerConfig);
-  string nodeName;
-  string portName = config["serial"]["port"];
+  JsonObject brokerConfig = config["broker"];
+  Redis redis(workerThread, brokerConfig);
+
   serialSession.init();
   serialSession.connect();
-  // zSession.scout();
-  broker.init();
-  broker.connect("serial");
-  brokerProxy.init();
-  brokerProxy.connect(config["serial"]["port"]);
-  // CBOR de-/serialization
 
   serialSession.incoming() >> [&](const Bytes &s) {
     //        INFO("RXD %s", hexDump(s).c_str());
   };
 
-  auto getAnyMsg = new SinkFunction<Bytes>([&](const Bytes &frame) {
-    int msgType;
-    cborReader.fill(frame);
-    if (cborReader.checkCrc()) {
-      //     INFO("RXD good Crc hex[%d] : %s", frame.size(),
-      //     hexDump(frame).c_str());
-      std::string s;
-      cborReader.parse().toJson(s);
-      Bytes bs = cborReader.toBytes();
-      //    INFO("RXD cbor[%d]: %s", bs.size(), hexDump(bs).c_str());
-      INFO("RXD cbor[%d]: %s", bs.size(), s.c_str());
-      if (cborReader.parse().array().get(msgType).ok()) {
-        switch (msgType) {
-          case B_PUBLISH: {
-            std::string topic;
-            if (cborReader.get(topic).ok()) {
-              String s;
-              cborReader.toJson(s);
-              if (s == "0.") s = "0.0";
-              broker.publish(topic, s);
-            } else {
-              INFO(" invalid CBOR publish");
-            }
-            break;
-          }
-          case B_SUBSCRIBE: {
-            std::string topic;
-            if (cborReader.get(topic).ok()) broker.subscribe(topic);
-            break;
-          }
-          case B_NODE: {
-            std::string nodeName;
-            if (cborReader.get(nodeName).ok()) {
-              String topic = "dst/";
-              topic += nodeName;
-              topic += "/*";
-              broker.subscribe(topic);
-              topic = "dst/";
-              topic += nodeName;
-              topic += "-proxy/*";
-              brokerProxy.subscribe(topic);
-            }
-            break;
-          }
-        }
-      }
-      cborReader.close();
-    } else {
-      if (frame.back() != '\n') {
-        INFO(" invalid CRC [%d] %s", frame.size(), hexDump(frame).c_str());
-        INFO("%s", std::string(frame.begin(), frame.end()).c_str());
-      }
-      serialSession.logs().emit(std::string(frame.begin(), frame.end()));
-    }
-  });
+  auto bytesToJson = new LambdaFlow<Bytes, Json>(
+      [&](Json &docIn, const Bytes &frame) {
+        std::string s = std::string(frame.begin(), frame.end());
+        INFO("REQ : '%s'", s.c_str());
+        docIn.clear();
+        return deserializeJson(docIn, s) == DeserializationError::Ok;
+      });
 
-  serialSession.incoming() >> getAnyMsg;
+  serialSession.incoming() >> bytesToJson >> redis.request();
+
+  auto jsonToBytes = new LambdaFlow<Json, Bytes>(
+      [&](Bytes &msg, const Json &docIn) {
+        std::string str;
+        size_t sz = serializeJson(docIn, str);
+        msg = Bytes(str.begin(), str.end());
+        return sz > 0;
+      });
+
+  redis.response() >> jsonToBytes >> serialSession.outgoing();
 
   SinkFunction<String> redisLogStream([&](const String &bs) {
     static String buffer;
     for (uint8_t b : bs) {
       if (b == '\n') {
         printf("%s%s%s\n", ColorOrange, buffer.c_str(), ColorDefault);
-        broker.command("XADD logs * node %s message %s ", nodeName.c_str(),
-                       buffer.c_str());
         buffer.clear();
       } else if (b == '\r') {  // drop
       } else {
@@ -173,23 +108,5 @@ int main(int argc, char **argv) {
   });
 
   serialSession.logs() >> redisLogStream;
-
-  /*
-        ::write(1, ColorOrange, strlen(ColorOrange));
-      ::write(1, bs.data(), bs.size());
-      ::write(1, ColorDefault, strlen(ColorDefault));
-  */
-  broker.incoming() >>
-      new LambdaFlow<PubMsg, Bytes>([&](Bytes &msg, const PubMsg &pub) {
-        CborWriter writer(100);
-        writer.reset().array().add(B_PUBLISH).add(pub.topic);
-        cborAddJson(writer, pub.payload);
-        writer.close();
-        writer.addCrc();
-        msg = writer.bytes();
-        return true;
-      }) >>
-      serialSession.outgoing();
-
   workerThread.run();
 }

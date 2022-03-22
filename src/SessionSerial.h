@@ -4,6 +4,7 @@
 #include <SessionAbstract.h>
 #include <limero.h>
 #include <serial.h>
+#include <ArduinoJson.h>
 
 // typedef enum { CMD_OPEN, CMD_CLOSE } TcpCommand;
 

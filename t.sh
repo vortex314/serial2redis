@@ -1,10 +1,11 @@
 while true
 do
 	sleep 1
-	echo '["HELLO",3]' 
+	echo -n '["hello","3"]'
 	sleep 1
 	DATE=`date`
-	echo '["PUBLISH","X","'$DATE'"]' 
-	echo '["PSUBSCRIBE","*"]'
+	echo -n '["publish","dst/node/system/loopback","$DATE"]'
+	sleep 1
+	echo -n '["psubscribe","dst/node/*"]'
 done
 

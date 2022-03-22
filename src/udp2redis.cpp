@@ -14,18 +14,12 @@
 #include <thread>
 #include <unordered_map>
 #include <utility>
-
-using namespace std;
+#include <Common.h>
 
 Log logger;
 
 //====================================================
 
-#define fatal(message)       \
-  {                          \
-    LOGW << message << LEND; \
-    exit(-1);                \
-  }
 
 bool loadConfig(JsonObject cfg, int argc, char **argv) {
   cfg["udp"]["port"] = 9999;
@@ -62,93 +56,6 @@ bool loadConfig(JsonObject cfg, int argc, char **argv) {
   INFO("%s", str.c_str());
   return true;
 };
-// "[ssn" "{"
-bool validate(JsonVariant js, std::string format) {
-  for (auto ch : format) {
-    switch (ch) {
-      case '[': {
-        if (!js.is<JsonArray>()) return false;
-        return validate(js[0], format.substr(1));
-        break;
-      }
-      case '{': {
-        if (!js.is<JsonObject>()) return false;
-        return validate(js[0], format.substr(1));
-        break;
-      }
-      case '}':
-        return true;
-      case ']':
-        return true;
-      case 's': {
-        if (!js.is<std::string>()) return false;
-        break;
-      }
-      case 'x': {
-        return true;
-        break;
-      }
-    }
-  }
-  return false;
-}
-
-int token(JsonVariant v) {
-  if (v.is<std::string>()) {
-    std::string s = v;
-    return H(s.c_str());
-  } else if (v.is<int>()) {
-    return v.as<int>();
-  }
-  return -1;
-}
-
-DynamicJsonDocument replyToJson(redisReply *reply) {
-  DynamicJsonDocument doc(10240);
-
-  switch (reply->type) {
-    case REDIS_REPLY_STATUS:
-    case REDIS_REPLY_ERROR:
-    case REDIS_REPLY_BIGNUM:
-    case REDIS_REPLY_VERB:
-    case REDIS_REPLY_STRING: {
-      doc.set(reply->str);
-      break;
-    };
-    case REDIS_REPLY_DOUBLE: {
-      doc.set(reply->dval);
-      break;
-    }
-    case REDIS_REPLY_INTEGER: {
-      doc.set(reply->integer);
-      break;
-    }
-    case REDIS_REPLY_NIL: {
-      doc.set(nullptr);
-      break;
-    }
-    case REDIS_REPLY_BOOL: {
-      doc.set(reply->integer != 0);
-      break;
-    }
-    case REDIS_REPLY_MAP: {
-      for (int i = 0; i < reply->elements; i += 2) {
-        doc[reply->element[i]->str] = replyToJson(reply->element[i + 1]);
-      }
-      break;
-    }
-    case REDIS_REPLY_SET:
-    case REDIS_REPLY_PUSH:
-    case REDIS_REPLY_ARRAY: {
-      for (int i = 0; i < reply->elements; i++)
-        doc.add(replyToJson(reply->element[i]));
-      break;
-    }
-  }
-  doc.shrinkToFit();
-  return doc;
-}
-
 //================================================================
 
 class ClientProxy : public Actor {
@@ -161,13 +68,15 @@ class ClientProxy : public Actor {
   bool _connected;
   std::string _redisHost;
   uint16_t _redisPort;
+  DynamicJsonDocument _docIn;
 
  public:
   ClientProxy(Thread &thread, JsonObject config, UdpAddress source)
       : Actor(thread),
         _sourceAddress(source),
         _incoming(10, "incoming"),
-        _outgoing(5, "outgoing") {
+        _outgoing(5, "outgoing"),
+        _docIn(10240) {
     INFO(" created clientProxy %s ", _sourceAddress.toString().c_str());
     _incoming.async(thread);
     _outgoing.async(thread);
@@ -196,7 +105,7 @@ class ClientProxy : public Actor {
       INFO(" Connection %s:%d failed", _redisHost.c_str(), _redisPort);
       return ENOTCONN;
     }
-    _ac->c.privdata=this;
+    _ac->c.privdata = this;
     redisAsyncSetConnectCallback(
         _ac, [](const redisAsyncContext *ac, int status) {
           INFO("REDIS connected : %d", status);
@@ -222,12 +131,13 @@ class ClientProxy : public Actor {
     return 0;
   }
 
-  void disconnect() {}
+  void disconnect() { thread().deleteInvoker(_ac->c.fd); }
 
   static void replyHandler(redisAsyncContext *c, void *reply, void *me) {
     ClientProxy *proxy = (ClientProxy *)me;
     if (reply) {
-      DynamicJsonDocument doc = replyToJson((redisReply *)reply);
+      DynamicJsonDocument doc(10240);
+      replyToJson(doc.as<JsonVariant>(),(redisReply *)reply);
       std::string resp;
       serializeJson(doc, resp);
       INFO(" reply %s ", resp.c_str());
@@ -242,75 +152,19 @@ class ClientProxy : public Actor {
              hexDump(bs).c_str());
       };*/
 
-    auto getAnyMsg =
-        new SinkFunction<std::string>([&](const std::string &frame) {
-          INFO("%s", frame.c_str());
-          int msgType;
-          DynamicJsonDocument docIn(10240);
-          std::string str((const char *)frame.data(), frame.size());
-          auto rc = deserializeJson(docIn, str);
-          if (rc != DeserializationError::Ok &&
-              (validate(docIn.as<JsonVariant>(), "[s") ||
-               validate(docIn.as<JsonVariant>(), "[n"))) {
-            WARN(" deserialization fails :'%s'", str.c_str());
-            return;
-          }
-          msgType = token(docIn[0]);
-          switch (msgType) {
-            case H("PUBLISH"): {
-              DynamicJsonDocument doc(1024);
-              std::string str;
-              doc.set(docIn[2]);
-              serializeJson(doc, str);
-              redisAsyncCommand(_ac, replyHandler, this, "PUBLISH %s %s",
-                                docIn[1].as<const char *>(), str.c_str());
-              redisAsyncWrite(_ac);
-              break;
-            }
-            case H("PSUBSCRIBE"): {
-              DynamicJsonDocument doc(1024);
-              std::string str;
-              doc.set(docIn[1]);
-              serializeJson(doc, str);
-              redisAsyncCommand(_ac, replyHandler, this, "PSUBSCRIBE %s %s",
-                                docIn[1].as<const char *>(), str.c_str());
-              redisAsyncWrite(_ac);
-              break;
-            }
-            case H("HELLO"): {
-              DynamicJsonDocument doc(1024);
-              std::string str;
-              doc.set(docIn[1]);
-              serializeJson(doc, str);
-              redisAsyncCommand(_ac, replyHandler, this, "HELLO %d",
-                                docIn[1].as<int>());
-              redisAsyncWrite(_ac);
-              break;
-            }
-            default: {
-              INFO("unknown message type ");
-              break;
-            }
-          }
-        });
-
-    _incoming >> getAnyMsg;
-
-    SinkFunction<std::string> redisLogStream([&](const std::string &bs) {
-      static std::string buffer;
-      for (uint8_t b : bs) {
-        if (b == '\n') {
-          printf("%s%s%s\n", ColorOrange, buffer.c_str(), ColorDefault);
-          redisAsyncCommand(
-              _ac, [](redisAsyncContext *ac, void *reply, void *me) {}, this,
-              "XADD logs * node %s message %s ", nodeName.c_str(),
-              buffer.c_str());
-          buffer.clear();
-        } else if (b == '\r') {  // drop
-        } else {
-          buffer += (char)b;
-        }
-      }
+    _incoming >> new SinkFunction<std::string>([&](const std::string &frame) {
+      INFO("REQ : '%s'", frame.c_str());
+      _docIn.clear();
+      deserializeJson(_docIn, frame);
+      JsonArray array = _docIn.as<JsonArray>();
+      const char *argv[100];
+      int argc;
+      for (int i = 0; i < array.size(); i++)
+        argv[i] = array[i].as<const char *>();
+      argc = array.size();
+      redisAsyncCommandArgv(_ac, replyHandler, this, argc, argv, NULL);
+      //     redisAsyncCommand(_ac, replyHandler, this, frame.c_str());
+      redisAsyncWrite(_ac);
     });
   }
   Sink<std::string> &incoming() { return _incoming; }
@@ -338,10 +192,11 @@ int main(int argc, char **argv) {
   INFO("%s", serverAddress.toString().c_str());
 
   udpSession.recv() >> [&](const UdpMsg &udpMsg) {
+    std::string payload =
+        std::string((const char *)udpMsg.message.data(), udpMsg.message.size());
     INFO(" UDP RXD %s => %s : %s", udpMsg.src.toString().c_str(),
-         udpMsg.dst.toString().c_str(),
-         std::string((const char *)udpMsg.message.data(), udpMsg.message.size())
-             .c_str());
+         udpMsg.dst.toString().c_str(), payload.c_str());
+
     UdpAddress udpSource = udpMsg.src;
     ClientProxy *clientProxy;
     auto it = clients.find(udpSource);
@@ -364,8 +219,7 @@ int main(int argc, char **argv) {
     } else {
       clientProxy = it->second;
     }
-    clientProxy->incoming().on(std::string((const char *)udpMsg.message.data(),
-                                           udpMsg.message.size()));
+    clientProxy->incoming().on(payload);
     // create new instance for broker connection
     // connect instrance to UdpMsg Stream
   };

@@ -1,4 +1,3 @@
-#include <CborDump.h>
 #include <SessionSerial.h>
 #include <ppp_frame.h>
 
@@ -21,13 +20,13 @@ public:
         }){};
 };
 
-SessionSerial::SessionSerial(Thread &thread, Config config)
+SessionSerial::SessionSerial(Thread &thread, JsonObject config)
     : SessionAbstract(thread, config), _incomingFrame(10, "_incomingMessage"),
       _outgoingFrame(10, "_outgoingMessage"),
       _incomingSerialRaw(10, "_incomingSerial") {
   _errorInvoker = new SerialSessionError(*this);
-  _port = config["port"].get<String>();
-  _baudrate = config["baudrate"].get<uint32_t>();
+  _port = config["port"] | "/dev/ttyUSB0";
+  _baudrate = config["baudrate"] | 115200;
   _incomingSerialRaw.async(thread);
   _outgoingFrame.async(thread);
   _incomingFrame.async(thread);
@@ -45,7 +44,7 @@ bool SessionSerial::init() {
   };
   _outgoingFrame >> [&](const Bytes &bs) {
  //   INFO("TXD [%d] %s ",bs.size(), hexDump(bs).c_str());
-    INFO("TXD %s ", cborDump(bs).c_str());
+    INFO("TXD %s ", std::string(bs.begin(),bs.end()).c_str());
   };
 
   bytesToFrame >> [&](const Bytes &data) {

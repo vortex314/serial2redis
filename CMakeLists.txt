@@ -27,6 +27,7 @@ target_sources(serial2redis PRIVATE
     src/config.cpp 
     src/SessionSerial.cpp
     src/serial.cpp 
+    src/Redis.cpp
     ${LIMERO}/linux/Log.cpp
     ${LIMERO}/linux/Sys.cpp
     ${LIMERO}/linux/limero.cpp
@@ -35,6 +36,7 @@ target_sources(serial2redis PRIVATE
     src/Frame.cpp
     src/frame.cpp
     src/Crc32.cpp
+    src/Common.cpp
     ${LIMERO}/src/StringUtility.cpp
     ) 
 
@@ -43,6 +45,7 @@ target_sources(udp2redis PRIVATE
     src/config.cpp 
     src/SessionUdp.cpp
     src/Udp.cpp 
+    src/Common.cpp
     ${LIMERO}/linux/Log.cpp
     ${LIMERO}/linux/Sys.cpp
     ${LIMERO}/linux/limero.cpp
