@@ -35,3 +35,19 @@ First parameter :
 [-2,767,"3.54"]
 [-3,"object/property","3.54"]
 ````
+
+SerialSession.read >> pppFrameExtract >> crcCheck >> bytesToJson >> Redis.request
+Redis.response >> jsonToBytes >> crcAdd >> pppFrameEnvelope >> SerialSession.write
+SerialSession.connected >> Redis.doConnect
+
+UdpListener.read >> UdpClient >> bytesToJson >> Redis.request
+Redis.response >> jsonToBytes >> UdpClient.send 
+
+microClient --> send PING Sys::micros() until PONG
+--> PSUBSCRIBE dst/node/*
+LOOP    --> PUBLISH dst/node/sys/loopback 9079  // current time in usec
+        --> recv "pmessage",...
+        --> PUBLISH src/node/sys/latency 76
+
+JsonArray.copyArray 
+
