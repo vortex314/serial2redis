@@ -32,9 +32,7 @@ target_sources(serial2redis PRIVATE
     ${LIMERO}/linux/Sys.cpp
     ${LIMERO}/linux/limero.cpp
     ${LIMERO}/src/printf.c
-    src/ppp_frame.cpp 
-    src/Frame.cpp
-    src/frame.cpp
+    src/FramePPP.cpp
     src/Crc32.cpp
     src/Common.cpp
     ${LIMERO}/src/StringUtility.cpp

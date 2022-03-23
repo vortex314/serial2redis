@@ -14,6 +14,7 @@
 #include <thread>
 #include <unordered_map>
 #include <utility>
+#include <PPP.h>
 
 Log logger;
 
@@ -67,6 +68,8 @@ int main(int argc, char **argv) {
   JsonObject brokerConfig = config["broker"];
   Redis redis(workerThread, brokerConfig);
 
+  PPP ppp;
+
   serialSession.init();
   serialSession.connect();
 
@@ -74,25 +77,37 @@ int main(int argc, char **argv) {
     //        INFO("RXD %s", hexDump(s).c_str());
   };
 
-  auto bytesToJson = new LambdaFlow<Bytes, Json>(
-      [&](Json &docIn, const Bytes &frame) {
+  auto bytesToJson =
+      new LambdaFlow<Bytes, Json>([&](Json &docIn, const Bytes &frame) {
         std::string s = std::string(frame.begin(), frame.end());
         INFO("REQ : '%s'", s.c_str());
         docIn.clear();
         return deserializeJson(docIn, s) == DeserializationError::Ok;
       });
 
-  serialSession.incoming() >> bytesToJson >> redis.request();
-
-  auto jsonToBytes = new LambdaFlow<Json, Bytes>(
-      [&](Bytes &msg, const Json &docIn) {
+  auto jsonToBytes =
+      new LambdaFlow<Json, Bytes>([&](Bytes &msg, const Json &docIn) {
         std::string str;
         size_t sz = serializeJson(docIn, str);
         msg = Bytes(str.begin(), str.end());
         return sz > 0;
       });
 
-  redis.response() >> jsonToBytes >> serialSession.outgoing();
+  auto pppFrameExtract = new LambdaFlow<Bytes, Bytes>(
+      [&](Bytes &out, const Bytes &in) { return true; });
+
+  auto pppFrameEnvelop = new LambdaFlow<Bytes, Bytes>(
+      [&](Bytes &out, const Bytes &in) { return true; });
+
+  auto crcCheck = new LambdaFlow<Bytes, Bytes>(
+      [&](Bytes &out, const Bytes &in) { return true; });
+
+  auto crcAdd = new LambdaFlow<Bytes, Bytes>(
+      [&](Bytes &out, const Bytes &in) { return true; });
+
+  serialSession.incoming() >> bytesToJson >> redis.request();
+
+  redis.response() >> jsonToBytes >> ppp.frame() >>  serialSession.outgoing();
 
   SinkFunction<String> redisLogStream([&](const String &bs) {
     static String buffer;

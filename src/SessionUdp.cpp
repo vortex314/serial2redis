@@ -1,5 +1,4 @@
 #include <SessionUdp.h>
-#include <ppp_frame.h>
 #include <StringUtility.h>
 
 SessionUdp::SessionUdp(Thread &thread, JsonObject config)
