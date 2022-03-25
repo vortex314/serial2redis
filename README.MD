@@ -1,6 +1,72 @@
+# TLDR;
+Hit the ground running example !
+Take you favorite Arduino and plug it in. 
+```
+#include <ArduinoJson.h>
+DynamicJsonDocument doc(1024);
+const char* command[] = {"TS.ADD","myTime","*","_"}
+void setup(){
+        Serial.begin(115200);
+        
+}
+void loop(){
+        doc[2]=millis();
+        serializeJson(doc,Serial);
+        Serial.println("");
+}
+```
+Setup PC
+```
+docker start redis
+docker start Grafana
+serial2redis  # using default ports /dev/ttyUSB0 on 115200 and Redis on localhost:6379
+```
+Grafana install , configure Redis and select TS
+# Rationale
+In my Robotic endeavours I was looking for a low latency Pub/sub mechanism with a high performant deployment on Raspberry Pi.
+So Redis was an excellent candidat for this. When working with IoT you often require some basic DB and time-series collection, which came as an extra out of the box.
+Looking at other features the stream structure is also something that will come handy for logging.
+
+I've looked at other solutions like ROS and ROS2 , they are often very complex to deploy and use,  and are less widely installed and used.
+
+A time-series viewing tool like Grafana works oput of the box with Redis.
+Connecting a log Redis stream to ElasticSearch is a piece of cake.
+
+In the chain sensors/actuators <-> Robot spine <->   Brain. 
+The Redis broker will acvt as the central spine. The idea is also to connect the Brain and the Spine with an extra-low-latency layer, looking at Unix domain sockets or the shared-memory. 
+# Serial to redis
+The purpose is to create a bridge between small devices and microcontrollers to communicate with Redis. To easily compose requests and parse response the protocol is based on JSON serialization. 
+
+The protocol is just a JSON form of the RESP3 (REdis Serialization Protocol ) and RESP2 protocol as this offers an access to all commands. The Hiredis library and his reply structure allow for a generic and recursive translation to JSON. Some nuances like Set are lost in translation however.
+
+I expect also that the mobikle robot on Raspberry Pi can replicate it's data to a PC for data capture and control. 
+
+# The protcol
+The RESP protocol specifies that the request is an array of strings, so the JSON equivalent is the same
+The RESP response can vary from a single integer till a highly complex structure of nested arrays and maps.
+
+The JSON library ArduinoJson is used because of its wide range of deployemnts from Arduino to all kind of other server platforms. 
+
+For IoT purpose it's often not needed to have responses to PUBLISH requests as these requests will be repeated continously. So a kind of QoS is possible 
+
+Since the commands and properties that go over the line are ofthen the same there is also the tokenization possible of the commands.
+In the protocol this can help tyo reduce the communication overhead.
+
+Example : ["PUBLISH","src/node/system/time", 17676876] becomes [578587,465435,17676876]
+or [231,"system/time",17676876]
+# Communication layer
+The current  serial2redis supports several communication layers :
+- UDP with each datagram a request and response ( no CRC or further framing needed )
+- Serial UART with CR/LF framing without CRC ( Arduino )
+- Serial UART with PPP framing and CRC. ( micro-controller actuators )
+- TBD : ESP-NOW bridge ( SWITCH= ESP_NOW-1 <-> )
 # Serial to redis Protocol
 The serial or udp endpoint is sending frames that contain a JSON array and receives as a response JSON Variant ( can be any variuable integer,bool,double,string,array or object )
 
+The RESP protocol specifies that the request is an array of strings, so the JSON equivalent is the same
+The RESP response can vary from a single integer till a highly complex structure of nested arrays and maps.
+
+The JSON library ArduinoJson is used because of its wide range of deployemnts from Arduino to all kind of other server platforms. 
 ```
 ["PUBLISH","X","3.5"]
 ["PSUBSCRIBE","dst/myNode/*"]
