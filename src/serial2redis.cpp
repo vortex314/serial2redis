@@ -71,7 +71,7 @@ int main(int argc, char **argv) {
   serialSession.init();
   serialSession.connect();
 
-  Framing crlf("\r\n", 1024);
+  Framing crlf("\r\n", 10000);
 
   auto bytesToJson =
       new LambdaFlow<Bytes, Json>([&](Json &docIn, const Bytes &frame) {

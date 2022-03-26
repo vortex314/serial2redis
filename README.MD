@@ -27,8 +27,8 @@ void loop()
 ![Alt text](doc/grafana.jpg?raw=true "Grafana  result")
 Setup PC
 ```
-docker start redis
-docker start Grafana
+docker run redislabs/redistimeseries
+docker run grafana/grafana
 serial2redis  # using default ports /dev/ttyUSB0 on 115200 and Redis on localhost:6379
 ```
 Grafana install , configure Redis and select TS
