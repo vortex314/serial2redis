@@ -23,6 +23,7 @@ void loadConfig(JsonDocument &cfg, int argc, char **argv) {
   // defaults
   cfg["serial"]["port"] = "/dev/ttyUSB0";
   cfg["serial"]["baudrate"] = 115200;
+  cfg["serial"]["frame"] = "CRLF";
   cfg["broker"]["host"] = "localhost";
   cfg["broker"]["port"] = 6379;
   // override args

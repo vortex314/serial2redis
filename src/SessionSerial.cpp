@@ -1,6 +1,5 @@
 #include <SessionSerial.h>
 
-
 SessionSerial::SessionSerial(Thread &thread, JsonObject config)
     : Actor(thread) {
   _errorInvoker = new SerialSessionError(*this);
@@ -12,20 +11,21 @@ bool SessionSerial::init() {
   _serialPort.port(_port);
   _serialPort.baudrate(_baudrate);
   _serialPort.init();
-  _outgoingFrame >>  [&](const Bytes &data) {
- //   INFO("TXD  %s => [%d] %s", _serialPort.port().c_str(),data.size(), hexDump(data).c_str());
+  _outgoingFrame >> [&](const Bytes &data) {
+    //   INFO("TXD  %s => [%d] %s", _serialPort.port().c_str(),data.size(),
+    //   hexDump(data).c_str());
     _serialPort.txd(data);
   };
   _outgoingFrame >> [&](const Bytes &bs) {
- //   INFO("TXD [%d] %s ",bs.size(), hexDump(bs).c_str());
-    INFO("TXD %s ", std::string(bs.begin(),bs.end()).c_str());
+    //   INFO("TXD [%d] %s ",bs.size(), hexDump(bs).c_str());
+    INFO("TXD %s ", std::string(bs.begin(), bs.end()).c_str());
   };
 
   return true;
 }
 
 bool SessionSerial::connect() {
-  _serialPort.connect();
+  if (_serialPort.connect() != 0) return false;
   thread().addReadInvoker(_serialPort.fd(), [&](int) { invoke(); });
   thread().addErrorInvoker(_serialPort.fd(), [&](int) { onError(); });
   return true;
@@ -39,9 +39,15 @@ bool SessionSerial::disconnect() {
 // on data incoming on filedescriptor
 void SessionSerial::invoke() {
   int rc = _serialPort.rxd(_rxdBuffer);
-  if (rc == 0) {                  // read ok
-    if (_rxdBuffer.size() == 0) { // but no data
-      WARN(" 0 data ");
+  if (rc == 0) {                   // read ok
+    if (_rxdBuffer.size() == 0) {  // but no data
+      WARN(" 0 data => connection lost ");
+      disconnect();
+      while (true) {
+        sleep(1);
+        if (connect()) break;
+        INFO(" reconnecting...");
+      };
     } else {
       _incomingFrame.on(_rxdBuffer);
     }

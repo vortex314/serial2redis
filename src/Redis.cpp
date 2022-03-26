@@ -8,7 +8,7 @@ Redis::Redis(Thread &thread, JsonObject config)
   _redisPort = config["port"] | 6379;
 };
 
- void Redis::onPush(redisAsyncContext *c, void *reply) {
+void Redis::onPush(redisAsyncContext *c, void *reply) {
   INFO(" PUSH received ");
 }
 
@@ -62,12 +62,15 @@ void Redis::replyHandler(redisAsyncContext *c, void *reply, void *me) {
     redis->_response.on(doc);
   } else {
     WARN("reply is null ");
+    Json doc;
+    doc.to<JsonVariant>().set(nullptr);
+    redis->_response.on(doc);
   }
 }
 void Redis::init() {
   _request >> new SinkFunction<Json>([&](const Json &docIn) {
-    if ( !_connected ) return;
-      Json* js = (Json*) &docIn;
+    if (!_connected) return;
+    Json *js = (Json *)&docIn;
     JsonArray array = js->as<JsonArray>();
     const char *argv[100];
     int argc;

@@ -31,7 +31,10 @@ docker run redislabs/redistimeseries
 docker run grafana/grafana
 serial2redis  # using default ports /dev/ttyUSB0 on 115200 and Redis on localhost:6379
 ```
-Grafana install , configure Redis and select TS
+The example sends Redis commands via the serial port and updating a list of measurements with a random value between 0 and 100. The key is named _randomArduino_ and contains labels _property_ equals _random_. 
+
+TS.ADD is understood by the Redis timeseries module. 
+
 # Rationale
 In my Robotic endeavours I was looking for a low latency Pub/sub mechanism with a high performant deployment on Raspberry Pi.
 So Redis was an excellent candidat for this. When working with IoT you often require some basic DB and time-series collection, which came as an extra out of the box.
