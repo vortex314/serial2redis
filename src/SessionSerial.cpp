@@ -1,44 +1,18 @@
 #include <SessionSerial.h>
-#include <ppp_frame.h>
 
-class BytesToString : public LambdaFlow<Bytes, String> {
-public:
-  BytesToString()
-      : LambdaFlow<Bytes, String>([&](String &out, const Bytes &in) {
-          out = String((const char *)in.data(),
-                       (const char *)(in.data() + in.size()));
-          return true;
-        }){};
-};
-
-class StringToBytes : public LambdaFlow<String, Bytes> {
-public:
-  StringToBytes()
-      : LambdaFlow<String, Bytes>([&](Bytes &out, const String &in) {
-          out = Bytes(in.data(), in.data() + in.length());
-          return true;
-        }){};
-};
 
 SessionSerial::SessionSerial(Thread &thread, JsonObject config)
-    : SessionAbstract(thread, config), _incomingFrame(10, "_incomingMessage"),
-      _outgoingFrame(10, "_outgoingMessage"),
-      _incomingSerialRaw(10, "_incomingSerial") {
+    : Actor(thread) {
   _errorInvoker = new SerialSessionError(*this);
   _port = config["port"] | "/dev/ttyUSB0";
   _baudrate = config["baudrate"] | 115200;
-  _incomingSerialRaw.async(thread);
-  _outgoingFrame.async(thread);
-  _incomingFrame.async(thread);
 }
 
 bool SessionSerial::init() {
   _serialPort.port(_port);
   _serialPort.baudrate(_baudrate);
   _serialPort.init();
-  _incomingSerialRaw >> bytesToFrame >> _incomingFrame;
-  bytesToFrame.logs >> new BytesToString() >> _logs;
-  _outgoingFrame >> frameToBytes >> [&](const Bytes &data) {
+  _outgoingFrame >>  [&](const Bytes &data) {
  //   INFO("TXD  %s => [%d] %s", _serialPort.port().c_str(),data.size(), hexDump(data).c_str());
     _serialPort.txd(data);
   };
@@ -47,12 +21,6 @@ bool SessionSerial::init() {
     INFO("TXD %s ", std::string(bs.begin(),bs.end()).c_str());
   };
 
-  bytesToFrame >> [&](const Bytes &data) {
-    //      INFO("RXD frame  %s", hexDump(data).c_str());
-  };
-  /*_incomingSerialRaw >> [&](const Bytes &data) {
-       INFO("RXD raw %s", hexDump(data).c_str());
-  };*/
   return true;
 }
 
@@ -75,7 +43,7 @@ void SessionSerial::invoke() {
     if (_rxdBuffer.size() == 0) { // but no data
       WARN(" 0 data ");
     } else {
-      _incomingSerialRaw.on(_rxdBuffer);
+      _incomingFrame.on(_rxdBuffer);
     }
   }
 }
@@ -92,7 +60,5 @@ Source<Bytes> &SessionSerial::incoming() { return _incomingFrame; }
 Sink<Bytes> &SessionSerial::outgoing() { return _outgoingFrame; }
 
 Source<bool> &SessionSerial::connected() { return _connected; }
-
-Source<String> &SessionSerial::logs() { return _logs; }
 
 string SessionSerial::port() { return _port; }

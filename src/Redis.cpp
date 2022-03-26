@@ -66,6 +66,7 @@ void Redis::replyHandler(redisAsyncContext *c, void *reply, void *me) {
 }
 void Redis::init() {
   _request >> new SinkFunction<Json>([&](const Json &docIn) {
+    if ( !_connected ) return;
       Json* js = (Json*) &docIn;
     JsonArray array = js->as<JsonArray>();
     const char *argv[100];

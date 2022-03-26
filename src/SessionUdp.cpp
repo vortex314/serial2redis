@@ -2,7 +2,7 @@
 #include <StringUtility.h>
 
 SessionUdp::SessionUdp(Thread &thread, JsonObject config)
-    : SessionAbstract(thread, config),
+    : Actor(thread),
       _incomingMessage(10, "_incomingMessage"),
       _outgoingMessage(10, "_outgoingMessage"),
       _send(10, "send"),

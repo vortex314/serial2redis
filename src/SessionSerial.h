@@ -1,16 +1,15 @@
 #ifndef _SESSION_SERAIL_H_
 #define _SESSION_SERIAL_H_
+#include <ArduinoJson.h>
 #include <Frame.h>
-#include <SessionAbstract.h>
 #include <limero.h>
 #include <serial.h>
-#include <ArduinoJson.h>
 
 // typedef enum { CMD_OPEN, CMD_CLOSE } TcpCommand;
 
 class SerialSessionError;
 
-class SessionSerial : public SessionAbstract {
+class SessionSerial : public Actor, public Invoker {
   SerialSessionError *_errorInvoker;
   int _serialfd;
   Serial _serialPort;
@@ -21,17 +20,11 @@ class SessionSerial : public SessionAbstract {
   Bytes _cleanData;
   uint64_t _lastFrameFlag;
   uint64_t _frameTimeout = 2000;
-  BytesToFrame bytesToFrame;
-  FrameToBytes frameToBytes;
-  QueueFlow<Bytes> _incomingSerialRaw;
-  QueueFlow<Bytes> _incomingFrame;
-  // QueueFlow<String> _incomingMessage;
-  QueueFlow<Bytes> _outgoingFrame;
+  ValueFlow<Bytes> _incomingFrame;
+  ValueFlow<Bytes> _outgoingFrame;
   ValueFlow<bool> _connected;
-  ValueFlow<String> _logs;
 
  public:
-  //  ValueSource<TcpCommand> command;
   SessionSerial(Thread &thread, JsonObject config);
   bool init();
   bool connect();
@@ -42,7 +35,6 @@ class SessionSerial : public SessionAbstract {
   Source<Bytes> &incoming();
   Sink<Bytes> &outgoing();
   Source<bool> &connected();
-  Source<String> &logs();
   string port();
 };
 

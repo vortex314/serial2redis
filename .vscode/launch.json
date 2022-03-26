@@ -11,8 +11,11 @@
             "name": "g++ - Build and debug active file",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/udp2redis",
-            "args": [],
+            "program": "${workspaceFolder}/build/serial2redis",
+            "args": [
+                "-s",
+                "/dev/ttyACM0"
+            ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],

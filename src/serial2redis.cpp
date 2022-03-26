@@ -1,7 +1,9 @@
 #include <ArduinoJson.h>
 #include <Common.h>
 #include <Frame.h>
+#include <Framing.h>
 #include <Log.h>
+#include <PPP.h>
 #include <Redis.h>
 #include <SessionSerial.h>
 #include <StringUtility.h>
@@ -14,11 +16,10 @@
 #include <thread>
 #include <unordered_map>
 #include <utility>
-#include <PPP.h>
 
 Log logger;
 
-void loadConfig(JsonObject cfg, int argc, char **argv) {
+void loadConfig(JsonDocument &cfg, int argc, char **argv) {
   // defaults
   cfg["serial"]["port"] = "/dev/ttyUSB0";
   cfg["serial"]["baudrate"] = 115200;
@@ -50,7 +51,7 @@ void loadConfig(JsonObject cfg, int argc, char **argv) {
     }
   std::string s;
   serializeJson(cfg, s);
-  INFO("config:%s", s);
+  INFO("config:%s", s.c_str());
 };
 
 //================================================================
@@ -59,23 +60,18 @@ void loadConfig(JsonObject cfg, int argc, char **argv) {
 int main(int argc, char **argv) {
   INFO("Loading configuration.");
   DynamicJsonDocument config(10240);
-  loadConfig(config.as<JsonObject>(), argc, argv);
+  loadConfig(config, argc, argv);
   Thread workerThread("worker");
 
-  JsonObject serialConfig = config["serial"];
-  SessionSerial serialSession(workerThread, config["serial"]);
+  Redis redis(workerThread, config["broker"].as<JsonObject>());
+  redis.init();
+  redis.connect();
 
-  JsonObject brokerConfig = config["broker"];
-  Redis redis(workerThread, brokerConfig);
-
-  PPP ppp;
-
+  SessionSerial serialSession(workerThread, config["serial"].as<JsonObject>());
   serialSession.init();
   serialSession.connect();
 
-  serialSession.incoming() >> [&](const Bytes &s) {
-    //        INFO("RXD %s", hexDump(s).c_str());
-  };
+  Framing crlf("\r\n", 1024);
 
   auto bytesToJson =
       new LambdaFlow<Bytes, Json>([&](Json &docIn, const Bytes &frame) {
@@ -89,39 +85,16 @@ int main(int argc, char **argv) {
       new LambdaFlow<Json, Bytes>([&](Bytes &msg, const Json &docIn) {
         std::string str;
         size_t sz = serializeJson(docIn, str);
+        INFO("RESP : '%s'", str.c_str());
         msg = Bytes(str.begin(), str.end());
         return sz > 0;
       });
 
-  auto pppFrameExtract = new LambdaFlow<Bytes, Bytes>(
-      [&](Bytes &out, const Bytes &in) { return true; });
+  serialSession.incoming() >> crlf.deframe() >> bytesToJson >> redis.request();
 
-  auto pppFrameEnvelop = new LambdaFlow<Bytes, Bytes>(
-      [&](Bytes &out, const Bytes &in) { return true; });
+  redis.response() >> jsonToBytes >> crlf.frame() >> serialSession.outgoing();
 
-  auto crcCheck = new LambdaFlow<Bytes, Bytes>(
-      [&](Bytes &out, const Bytes &in) { return true; });
+  printf("%s%s%s\n", ColorOrange, "Orange", ColorDefault);
 
-  auto crcAdd = new LambdaFlow<Bytes, Bytes>(
-      [&](Bytes &out, const Bytes &in) { return true; });
-
-  serialSession.incoming() >> bytesToJson >> redis.request();
-
-  redis.response() >> jsonToBytes >> ppp.frame() >>  serialSession.outgoing();
-
-  SinkFunction<String> redisLogStream([&](const String &bs) {
-    static String buffer;
-    for (uint8_t b : bs) {
-      if (b == '\n') {
-        printf("%s%s%s\n", ColorOrange, buffer.c_str(), ColorDefault);
-        buffer.clear();
-      } else if (b == '\r') {  // drop
-      } else {
-        buffer += (char)b;
-      }
-    }
-  });
-
-  serialSession.logs() >> redisLogStream;
   workerThread.run();
 }

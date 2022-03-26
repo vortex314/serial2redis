@@ -1,6 +1,5 @@
 #ifndef _SESSION_UDP_H_
 #define _SESSION_UDP_H_
-#include <SessionAbstract.h>
 #include <Udp.h>
 #include <limero.h>
 
@@ -10,7 +9,7 @@
 
 class UdpSessionError;
 
-class SessionUdp : public SessionAbstract {
+class SessionUdp : public Actor {
   UdpSessionError *_errorInvoker;
   int _serialfd;
   Udp _udp;

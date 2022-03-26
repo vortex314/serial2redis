@@ -2,19 +2,29 @@
 Hit the ground running example !
 Take you favorite Arduino and plug it in. 
 ```
+#include <Arduino.h>
 #include <ArduinoJson.h>
+
+const char *addCmd[] = {"TS.ADD", "randomArduino", "*", "____","LABELS","property","random"};
 DynamicJsonDocument doc(1024);
-const char* command[] = {"TS.ADD","myTime","*","_"}
-void setup(){
-        Serial.begin(115200);
-        
+
+#include <Arduino.h>
+void setup()
+{
+  Serial.begin(115200);
 }
-void loop(){
-        doc[2]=millis();
-        serializeJson(doc,Serial);
-        Serial.println("");
+void loop()
+{
+  doc.clear();
+  JsonArray array = doc.to<JsonArray>();
+  copyArray( addCmd,array);
+  doc[3] = std::to_string(random(0,100));
+  serializeJson(doc, Serial);
+  Serial.println();
+  delay(100);                      // wait for a second
 }
 ```
+![Alt text](doc/grafana.jpg?raw=true "Grafana  result")
 Setup PC
 ```
 docker start redis
