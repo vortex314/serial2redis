@@ -35,7 +35,7 @@ Framing::Framing(const char* delimiter, size_t maxFrameLength) {
     //    for (auto c : _delimiter) out.push_back(c);
     out.insert(out.end(), in.begin(), in.end());
     for (auto c : _delimiter) out.push_back(c);
-    return false;
+    return true;
   });
 
   _deframe = new Deframer(delimiter, maxFrameLength);

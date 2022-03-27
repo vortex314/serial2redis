@@ -77,18 +77,24 @@ int main(int argc, char **argv) {
   auto bytesToJson =
       new LambdaFlow<Bytes, Json>([&](Json &docIn, const Bytes &frame) {
         std::string s = std::string(frame.begin(), frame.end());
-        INFO("REQ : '%s'", s.c_str());
+        if (s.c_str() == nullptr) return false;
         docIn.clear();
-        return deserializeJson(docIn, s) == DeserializationError::Ok;
+        auto rc = deserializeJson(docIn, s);
+        if (rc != DeserializationError::Ok) {
+          INFO("RXD : %s%s%s", ColorOrange, s.c_str(), ColorDefault);
+        } else {
+//          INFO("RXD : '%s'", s.c_str());
+        }
+        return rc == DeserializationError::Ok;
       });
 
   auto jsonToBytes =
       new LambdaFlow<Json, Bytes>([&](Bytes &msg, const Json &docIn) {
         std::string str;
         size_t sz = serializeJson(docIn, str);
-        INFO("RESP : '%s'", str.c_str());
+//        INFO("TXD : '%s'", str.c_str());
         msg = Bytes(str.begin(), str.end());
-        return sz > 0;
+        return str.size() > 0;
       });
 
   serialSession.incoming() >> crlf.deframe() >> bytesToJson >> redis.request();

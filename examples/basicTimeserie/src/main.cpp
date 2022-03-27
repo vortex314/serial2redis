@@ -1,3 +1,6 @@
+/*
+ Adapt platformio.ini to your specific µcontroller !
+*/
 #include <Arduino.h>
 #include <ArduinoJson.h>
 

@@ -1,4 +1,5 @@
 #include <SessionSerial.h>
+#include <StringUtility.h>
 
 SessionSerial::SessionSerial(Thread &thread, JsonObject config)
     : Actor(thread) {
@@ -12,15 +13,10 @@ bool SessionSerial::init() {
   _serialPort.baudrate(_baudrate);
   _serialPort.init();
   _outgoingFrame >> [&](const Bytes &data) {
-    //   INFO("TXD  %s => [%d] %s", _serialPort.port().c_str(),data.size(),
-    //   hexDump(data).c_str());
+   // INFO("TXD  %s => [%d] %s", _serialPort.port().c_str(),data.size(),
+   //    hexDump(data).c_str());
     _serialPort.txd(data);
   };
-  _outgoingFrame >> [&](const Bytes &bs) {
-    //   INFO("TXD [%d] %s ",bs.size(), hexDump(bs).c_str());
-    INFO("TXD %s ", std::string(bs.begin(), bs.end()).c_str());
-  };
-
   return true;
 }
 

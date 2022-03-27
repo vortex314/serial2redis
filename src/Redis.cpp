@@ -69,13 +69,15 @@ void Redis::replyHandler(redisAsyncContext *c, void *reply, void *me) {
 }
 void Redis::init() {
   _request >> new SinkFunction<Json>([&](const Json &docIn) {
-    if (!_connected) return;
+    if (!_connected || !docIn.is<JsonArray>()) return;
     Json *js = (Json *)&docIn;
     JsonArray array = js->as<JsonArray>();
     const char *argv[100];
     int argc;
-    for (int i = 0; i < array.size(); i++)
+    for (int i = 0; i < array.size(); i++) {
+      if (!array[i].is<const char *>()) return;
       argv[i] = array[i].as<const char *>();
+    }
     argc = array.size();
     redisAsyncCommandArgv(_ac, replyHandler, this, argc, argv, NULL);
     redisAsyncWrite(_ac);
