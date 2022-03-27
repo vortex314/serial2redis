@@ -1,8 +1,10 @@
 
 #include <ArduinoJson.h>
+#include <Common.h>
 #include <Fnv.h>
 #include <Frame.h>
 #include <Log.h>
+#include <Redis.h>
 #include <SessionUdp.h>
 #include <StringUtility.h>
 #include <Udp.h>
@@ -14,12 +16,10 @@
 #include <thread>
 #include <unordered_map>
 #include <utility>
-#include <Common.h>
 
 Log logger;
 
 //====================================================
-
 
 bool loadConfig(JsonObject cfg, int argc, char **argv) {
   cfg["udp"]["port"] = 9999;
@@ -69,6 +69,10 @@ class ClientProxy : public Actor {
   std::string _redisHost;
   uint16_t _redisPort;
   DynamicJsonDocument _docIn;
+  Redis _redis;
+  uint64_t _lastMessage;
+  LambdaFlow<std::string, Json> *_stringToJson;
+  LambdaFlow<Json, std::string> *_jsonToString;
 
  public:
   ClientProxy(Thread &thread, JsonObject config, UdpAddress source)
@@ -76,100 +80,51 @@ class ClientProxy : public Actor {
         _sourceAddress(source),
         _incoming(10, "incoming"),
         _outgoing(5, "outgoing"),
-        _docIn(10240) {
+        _docIn(10240),
+        _redis(thread, config) {
     INFO(" created clientProxy %s ", _sourceAddress.toString().c_str());
+    _stringToJson = new LambdaFlow<std::string, Json>(
+        [&](Json &docIn, const std::string &s) {
+          if (s.c_str() == nullptr) return false;
+          docIn.clear();
+          auto rc = deserializeJson(docIn, s);
+          if (rc != DeserializationError::Ok) {
+            INFO("RXD : %s%s%s", ColorOrange, s.c_str(), ColorDefault);
+          } else {
+            //          INFO("RXD : '%s'", s.c_str());
+          }
+          return rc == DeserializationError::Ok;
+        });
+    _jsonToString = new LambdaFlow<Json, std::string>(
+        [&](std::string &msg, const Json &docIn) {
+          size_t sz = serializeJson(docIn, msg);
+          return true;
+        });
+
     _incoming.async(thread);
     _outgoing.async(thread);
-    _redisHost = config["host"] | "localhost";
-    _redisPort = config["port"] | 6379;
+    _redis.init();
+
+    _redis.response() >> _jsonToString >> _outgoing;
+    _incoming >> _stringToJson >> _redis.request();
+    _incoming >> [&](const std::string &s) { _lastMessage = Sys::millis(); };
   };
 
-  static void onPush(redisAsyncContext *c, void *reply) {
-    INFO(" PUSH received ");
+  ~ClientProxy() {
+    INFO(" deleted clientProxy %s ", _sourceAddress.toString().c_str());
+//    delete _stringToJson;
+//    delete _jsonToString;
   }
 
-  static void free_privdata(void *pvdata) {}
+  int connect() { return _redis.connect(); }
 
-  int connect() {
-    INFO("Connecting to Redis %s:%d as '%s'.", _redisHost.c_str(), _redisPort,
-         _node.c_str());
-    redisOptions options = {0};
-    REDIS_OPTIONS_SET_TCP(&options, _redisHost.c_str(), _redisPort);
-    options.connect_timeout = new timeval{3, 0};  // 3 sec
-    options.command_timeout = new timeval{3, 0};  // 3 sec
-    REDIS_OPTIONS_SET_PRIVDATA(&options, this, free_privdata);
-    //    redisAsyncInitialize()
-    _ac = redisAsyncConnect(Sys::hostname(), 6379);
+  void disconnect() { _redis.disconnect(); }
 
-    if (_ac == NULL || _ac->err) {
-      INFO(" Connection %s:%d failed", _redisHost.c_str(), _redisPort);
-      return ENOTCONN;
-    }
-    _ac->c.privdata = this;
-    redisAsyncSetConnectCallback(
-        _ac, [](const redisAsyncContext *ac, int status) {
-          INFO("REDIS connected : %d", status);
-          ClientProxy *me = (ClientProxy *)ac->c.privdata;
-          me->_connected = true;
-        });
-    redisAsyncSetPushCallback(_ac, onPush);
-
-    int rc = redisAsyncSetDisconnectCallback(
-        _ac, [](const redisAsyncContext *ac, int status) {
-          WARN("REDIS disconnected : %d", status);
-          ClientProxy *me = (ClientProxy *)ac->c.privdata;
-          me->_connected = false;
-          me->disconnect();
-          me->connect();
-        });
-
-    thread().addErrorInvoker(_ac->c.fd, [&](int) { WARN(" error on fd "); });
-    thread().addReadInvoker(_ac->c.fd, [&](int) { redisAsyncHandleRead(_ac); });
-    thread().addWriteInvoker(_ac->c.fd,
-                             [&](int) { redisAsyncHandleWrite(_ac); });
-    _connected = true;
-    return 0;
-  }
-
-  void disconnect() { thread().deleteInvoker(_ac->c.fd); }
-
-  static void replyHandler(redisAsyncContext *c, void *reply, void *me) {
-    ClientProxy *proxy = (ClientProxy *)me;
-    if (reply) {
-      DynamicJsonDocument doc(10240);
-      replyToJson(doc.as<JsonVariant>(),(redisReply *)reply);
-      std::string resp;
-      serializeJson(doc, resp);
-      INFO(" reply %s ", resp.c_str());
-      proxy->_outgoing.on(resp);
-    } else {
-      WARN("reply is null ");
-    }
-  }
-  void init() {
-    /*  _incoming >> [&](const std::string &bs) {
-        INFO(" %s client rxd %s ", _sourceAddress.toString().c_str(),
-             hexDump(bs).c_str());
-      };*/
-
-    _incoming >> new SinkFunction<std::string>([&](const std::string &frame) {
-      INFO("REQ : '%s'", frame.c_str());
-      _docIn.clear();
-      deserializeJson(_docIn, frame);
-      JsonArray array = _docIn.as<JsonArray>();
-      const char *argv[100];
-      int argc;
-      for (int i = 0; i < array.size(); i++)
-        argv[i] = array[i].as<const char *>();
-      argc = array.size();
-      redisAsyncCommandArgv(_ac, replyHandler, this, argc, argv, NULL);
-      //     redisAsyncCommand(_ac, replyHandler, this, frame.c_str());
-      redisAsyncWrite(_ac);
-    });
-  }
+  void init() {}
   Sink<std::string> &incoming() { return _incoming; }
   Source<std::string> &outgoing() { return _outgoing; }
   UdpAddress src() { return _sourceAddress; }
+  uint64_t lastMessage() { return _lastMessage; }
 };
 
 //==========================================================================
@@ -193,8 +148,8 @@ int main(int argc, char **argv) {
 
   udpSession.recv() >> [&](const UdpMsg &udpMsg) {
     std::string payload =
-        std::string((const char *)udpMsg.message.data(), udpMsg.message.size());
-    INFO(" UDP RXD %s => %s : %s", udpMsg.src.toString().c_str(),
+        std::string(udpMsg.message.begin(), udpMsg.message.end());
+    INFO("UDP RXD %s => %s : %s", udpMsg.src.toString().c_str(),
          udpMsg.dst.toString().c_str(), payload.c_str());
 
     UdpAddress udpSource = udpMsg.src;
@@ -208,7 +163,7 @@ int main(int argc, char **argv) {
         msg.message = std::vector<uint8_t>(bs.data(), bs.data() + bs.size());
         msg.dst = clientProxy->src();
         msg.src = serverAddress;
-        INFO("TXD UDP %s=>%s:%s ", msg.src.toString().c_str(),
+        INFO("UDP TXD %s => %s : %s ", msg.src.toString().c_str(),
              msg.dst.toString().c_str(),
              std::string((const char *)msg.message.data(), msg.message.size())
                  .c_str());
@@ -222,6 +177,25 @@ int main(int argc, char **argv) {
     clientProxy->incoming().on(payload);
     // create new instance for broker connection
     // connect instrance to UdpMsg Stream
+  };
+
+// cleanup inactive clients 
+
+  TimerSource ts(workerThread, 3000, true);
+  ts >> [&](const TimerMsg &) {
+    INFO(" active clients : %d ",clients.size());
+    auto itr = clients.begin();
+    while (itr != clients.end()) {
+      if (itr->second->lastMessage() < (Sys::millis() - 5000)) {
+        INFO(" deleting client after timeout.");
+        ClientProxy *proxy = itr->second;
+        itr = clients.erase(itr);
+        delete proxy;
+        INFO("cleanup done");
+      } else {
+        ++itr;
+      }
+    }
   };
 
   workerThread.run();

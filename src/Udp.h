@@ -9,6 +9,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
+
 #include <string>
 #include <vector>
 typedef std::vector<uint8_t> Bytes;
@@ -38,13 +39,17 @@ struct UdpAddress {
   in_addr_t ip;
   uint16_t port;
   bool operator==(UdpAddress &other) {
-    return memcmp(&other.ip, &ip,sizeof ip) ==0 && other.port == port;
+    return memcmp(&other.ip, &ip, sizeof ip) == 0 && other.port == port;
   }
   static bool fromUri(UdpAddress &, std::string);
   /* bool operator()(const UdpAddress &lhs, const UdpAddress &rhs) const {
      return false;
    }*/
-  bool operator<(const UdpAddress &other) const { return memcmp(&other.ip, &ip,sizeof ip)<0 ; }
+  bool operator<(const UdpAddress &other) const {
+    int rc = memcmp(&other.ip, &ip, sizeof ip);
+    if (rc) return rc == -1;
+    return other.port < port;
+  }
   /*UdpAddress& operator=(const UdpAddress& rhs){
     port = rhs.port;
     memcpy(&ip,&rhs.ip,sizeof( in_addr_t));

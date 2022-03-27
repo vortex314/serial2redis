@@ -40,6 +40,7 @@ target_sources(serial2redis PRIVATE
 
 target_sources(udp2redis PRIVATE 
     src/udp2redis.cpp 
+    src/Redis.cpp
     src/config.cpp 
     src/SessionUdp.cpp
     src/Udp.cpp 

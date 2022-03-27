@@ -15,9 +15,11 @@ class Redis : public Actor {
   std::string _redisHost;
   uint16_t _redisPort;
   Json _docIn;
+  bool _reconnectOnConnectionLoss;
 
  public:
   Redis(Thread &thread, JsonObject config);
+  ~Redis();
   void init();
 
   static void onPush(redisAsyncContext *c, void *reply);

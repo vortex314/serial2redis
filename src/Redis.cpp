@@ -6,15 +6,27 @@ Redis::Redis(Thread &thread, JsonObject config)
   _response.async(thread);
   _redisHost = config["host"] | "localhost";
   _redisPort = config["port"] | 6379;
+  _ac = 0;
+  _reconnectOnConnectionLoss = true;
 };
+
+Redis::~Redis() {
+  INFO("~Redis()");
+  _reconnectOnConnectionLoss = false;
+  thread().deleteInvoker(_ac->c.fd);
+
+  // redisAsyncSetDisconnectCallback(_ac, NULL); // this doens't work a second
+  // time redisAsyncSetConnectCallback(_ac, NULL);
+  if (_connected) disconnect();
+  //  if (_ac) redisAsyncFree(_ac);
+}
 
 void Redis::onPush(redisAsyncContext *c, void *reply) {
   INFO(" PUSH received ");
 }
 
 int Redis::connect() {
-  INFO("Connecting to Redis %s:%d as '%s'.", _redisHost.c_str(), _redisPort,
-       _node.c_str());
+  INFO("Connecting to Redis %s:%d.", _redisHost.c_str(), _redisPort);
   redisOptions options = {0};
   REDIS_OPTIONS_SET_TCP(&options, _redisHost.c_str(), _redisPort);
   options.connect_timeout = new timeval{3, 0};  // 3 sec
@@ -41,8 +53,8 @@ int Redis::connect() {
         WARN("REDIS disconnected : %d", status);
         Redis *me = (Redis *)ac->c.privdata;
         me->_connected = false;
-        me->disconnect();
-        me->connect();
+        me->thread().deleteInvoker(me->_ac->c.fd);
+        if (me->_reconnectOnConnectionLoss) me->connect();
       });
 
   thread().addErrorInvoker(_ac->c.fd, [&](int) { WARN(" error on fd "); });
@@ -52,7 +64,11 @@ int Redis::connect() {
   return 0;
 }
 
-void Redis::disconnect() { thread().deleteInvoker(_ac->c.fd); }
+void Redis::disconnect() {
+  INFO(" disconnect called");
+  redisAsyncDisconnect(_ac);
+  _connected = false;
+}
 
 void Redis::replyHandler(redisAsyncContext *c, void *reply, void *me) {
   Redis *redis = (Redis *)me;
