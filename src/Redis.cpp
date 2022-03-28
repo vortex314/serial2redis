@@ -59,7 +59,9 @@ int Redis::connect() {
 
   thread().addErrorInvoker(_ac->c.fd, [&](int) { WARN(" error on fd "); });
   thread().addReadInvoker(_ac->c.fd, [&](int) { redisAsyncHandleRead(_ac); });
-  thread().addWriteInvoker(_ac->c.fd, [&](int) { redisAsyncHandleWrite(_ac); });
+  thread().addWriteInvoker(_ac->c.fd, [&](int) { 
+    redisAsyncHandleWrite(_ac); 
+    });
   _connected = true;
   return 0;
 }
@@ -96,7 +98,7 @@ void Redis::init() {
     }
     argc = array.size();
     redisAsyncCommandArgv(_ac, replyHandler, this, argc, argv, NULL);
-    redisAsyncWrite(_ac);
+//    redisAsyncWrite(_ac);
   });
 }
 

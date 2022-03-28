@@ -112,8 +112,8 @@ class ClientProxy : public Actor {
 
   ~ClientProxy() {
     INFO(" deleted clientProxy %s ", _sourceAddress.toString().c_str());
-//    delete _stringToJson;
-//    delete _jsonToString;
+    delete _stringToJson;
+    delete _jsonToString;
   }
 
   int connect() { return _redis.connect(); }
