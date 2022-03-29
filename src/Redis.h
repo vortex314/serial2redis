@@ -31,5 +31,11 @@ class Redis : public Actor {
 
   Sink<Json> &request();
   Source<Json> &response();
+
+  static void addWriteFd(void *pv);
+  static void addReadFd(void *pv);
+  static void delWriteFd(void *pv);
+  static void delReadFd(void *pv);
+  static void cleanupFd(void *pv);
 };
 #endif

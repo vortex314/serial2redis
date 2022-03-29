@@ -1,5 +1,37 @@
 #include <Redis.h>
 
+void Redis::addWriteFd(void *pv) {
+//  INFO("addWriteFd %X", pv);
+  Redis *redis = (Redis *)pv;
+  redis->thread().addWriteInvoker(
+      redis->_ac->c.fd, [redis](int) { redisAsyncHandleWrite(redis->_ac); });
+}
+
+void Redis::addReadFd(void *pv) {
+  Redis *redis = (Redis *)pv;
+//  INFO("addReadFd %X", pv);
+  redis->thread().addReadInvoker(
+      redis->_ac->c.fd, [redis](int) { redisAsyncHandleRead(redis->_ac); });
+}
+
+void Redis::delWriteFd(void *pv) {
+  Redis *redis = (Redis *)pv;
+//  INFO("delWriteFd %X ", pv);
+  redis->thread().deleteInvoker(redis->_ac->c.fd);
+}
+
+void Redis::delReadFd(void *pv) {
+//  INFO("delReadFd %X", pv);
+  Redis *redis = (Redis *)pv;
+  redis->thread().deleteInvoker(redis->_ac->c.fd);
+}
+
+void Redis::cleanupFd(void *pv) {
+//  INFO("cleanupFd %X", pv);
+  Redis *redis = (Redis *)pv;
+  redis->thread().deleteInvoker(redis->_ac->c.fd);
+}
+
 Redis::Redis(Thread &thread, JsonObject config)
     : Actor(thread), _request(10, "request"), _response(5, "response") {
   _request.async(thread);
@@ -13,7 +45,7 @@ Redis::Redis(Thread &thread, JsonObject config)
 Redis::~Redis() {
   INFO("~Redis()");
   _reconnectOnConnectionLoss = false;
-  thread().deleteInvoker(_ac->c.fd);
+  // thread().deleteInvoker(_ac->c.fd);
 
   // redisAsyncSetDisconnectCallback(_ac, NULL); // this doens't work a second
   // time redisAsyncSetConnectCallback(_ac, NULL);
@@ -42,7 +74,7 @@ int Redis::connect() {
   _ac->c.privdata = this;
   redisAsyncSetConnectCallback(_ac,
                                [](const redisAsyncContext *ac, int status) {
-                                 INFO("REDIS connected : %d", status);
+                                 INFO("REDIS %X connected : %d", ac, status);
                                  Redis *me = (Redis *)ac->c.privdata;
                                  me->_connected = true;
                                });
@@ -53,15 +85,28 @@ int Redis::connect() {
         WARN("REDIS disconnected : %d", status);
         Redis *me = (Redis *)ac->c.privdata;
         me->_connected = false;
-        me->thread().deleteInvoker(me->_ac->c.fd);
+        //  me->thread().deleteInvoker(me->_ac->c.fd);
         if (me->_reconnectOnConnectionLoss) me->connect();
       });
 
-  thread().addErrorInvoker(_ac->c.fd, [&](int) { WARN(" error on fd "); });
-  thread().addReadInvoker(_ac->c.fd, [&](int) { redisAsyncHandleRead(_ac); });
-  thread().addWriteInvoker(_ac->c.fd, [&](int) { 
-    redisAsyncHandleWrite(_ac); 
+  _ac->ev.addRead = addReadFd;
+  _ac->ev.delRead = delReadFd;
+  _ac->ev.addWrite = addWriteFd;
+  _ac->ev.delWrite = delWriteFd;
+  _ac->ev.cleanup = cleanupFd;
+  _ac->ev.data = this;
+  /*
+    thread().addErrorInvoker(_ac->c.fd, [&](int) { WARN(" error on fd "); });
+    thread().addReadInvoker(_ac->c.fd, [&](int) {
+      //    INFO("READ");
+      redisAsyncHandleRead(_ac);
     });
+    /*  thread().addWriteInvoker(_ac->c.fd, [&](int) {
+        INFO("WRITE");
+        redisAsyncHandleWrite(_ac);
+        }); */
+  //  redisAsyncWrite(_ac);
+
   _connected = true;
   return 0;
 }
@@ -98,7 +143,7 @@ void Redis::init() {
     }
     argc = array.size();
     redisAsyncCommandArgv(_ac, replyHandler, this, argc, argv, NULL);
-//    redisAsyncWrite(_ac);
+    redisAsyncWrite(_ac);
   });
 }
 
