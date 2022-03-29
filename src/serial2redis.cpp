@@ -35,6 +35,9 @@ void loadConfig(JsonDocument &cfg, int argc, char **argv) {
       case 's':
         cfg["serial"]["port"] = optarg;
         break;
+      case 'f':
+        cfg["serial"]["frame"] = optarg;
+        break;
       case 'h':
         cfg["broker"]["host"] = optarg;
         break;
@@ -73,6 +76,7 @@ int main(int argc, char **argv) {
   serialSession.connect();
 
   Framing crlf("\r\n", 10000);
+  PPP ppp(1024);
 
   auto bytesToJson =
       new LambdaFlow<Bytes, Json>([&](Json &docIn, const Bytes &frame) {
@@ -83,7 +87,7 @@ int main(int argc, char **argv) {
         if (rc != DeserializationError::Ok) {
           INFO("RXD : %s%s%s", ColorOrange, s.c_str(), ColorDefault);
         } else {
-//          INFO("RXD : '%s'", s.c_str());
+          //          INFO("RXD : '%s'", s.c_str());
         }
         return rc == DeserializationError::Ok;
       });
@@ -92,14 +96,26 @@ int main(int argc, char **argv) {
       new LambdaFlow<Json, Bytes>([&](Bytes &msg, const Json &docIn) {
         std::string str;
         size_t sz = serializeJson(docIn, str);
-//        INFO("TXD : '%s'", str.c_str());
+        //        INFO("TXD : '%s'", str.c_str());
         msg = Bytes(str.begin(), str.end());
         return str.size() > 0;
       });
 
-  serialSession.incoming() >> crlf.deframe() >> bytesToJson >> redis.request();
+  std::string framing = config["serial"]["frame"] | "crlf";
 
-  redis.response() >> jsonToBytes >> crlf.frame() >> serialSession.outgoing();
+  if (framing == "crlf") {
+    serialSession.incoming() >> crlf.deframe() >> bytesToJson >>
+        redis.request();
+
+    redis.response() >> jsonToBytes >> crlf.frame() >> serialSession.outgoing();
+  } else if (framing == "ppp") {
+    serialSession.incoming() >> ppp.deframe() >> bytesToJson >> redis.request();
+
+    redis.response() >> jsonToBytes >> ppp.frame() >> serialSession.outgoing();
+  } else {
+    WARN("unknown framing");
+    exit(-1);
+  }
 
   printf("%s%s%s\n", ColorOrange, "Orange", ColorDefault);
 

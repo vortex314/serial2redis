@@ -29,6 +29,7 @@ target_sources(serial2redis PRIVATE
     src/serial.cpp 
     src/Redis.cpp
     src/Framing.cpp
+    src/PPP.cpp
     ${LIMERO}/linux/Log.cpp
     ${LIMERO}/linux/Sys.cpp
     ${LIMERO}/linux/limero.cpp
