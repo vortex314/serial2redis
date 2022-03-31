@@ -26,18 +26,22 @@ bool loadConfig(JsonObject cfg, int argc, char **argv) {
   cfg["udp"]["host"] = "0.0.0.0";
   cfg["redis"]["host"] = "localhost";
   cfg["redis"]["port"] = 6379;
+  cfg["proxy"]["timeout"] = 5000;
 
   // override args
   int c;
-  while ((c = getopt(argc, argv, "h:p:s:u:")) != -1) switch (c) {
+  while ((c = getopt(argc, argv, "h:p:n:u:t:")) != -1) switch (c) {
       case 'u':
         cfg["udp"]["port"] = atoi(optarg);
         break;
-      case 's':
+      case 'n':
         cfg["udp"]["net"] = optarg;
         break;
       case 'h':
         cfg["broker"]["host"] = optarg;
+        break;
+      case 't':
+        cfg["proxy"]["timeout"] = atoi(optarg);
         break;
       case 'p':
         cfg["broker"]["port"] = atoi(optarg);
@@ -133,6 +137,7 @@ int main(int argc, char **argv) {
   DynamicJsonDocument config(10240);
   loadConfig(config.to<JsonObject>(), argc, argv);
   Thread workerThread("worker");
+  uint32_t proxyTimeout = config["proxy"]["timeout"];
   JsonObject udpConfig = config["udp"];
 
   SessionUdp udpSession(workerThread, config["udp"]);
@@ -181,7 +186,7 @@ int main(int argc, char **argv) {
 
 // cleanup inactive clients 
 
-  TimerSource ts(workerThread, 3000, true);
+  TimerSource ts(workerThread, proxyTimeout , true);
   ts >> [&](const TimerMsg &) {
     INFO(" active clients : %d ",clients.size());
     auto itr = clients.begin();

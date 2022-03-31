@@ -26,9 +26,10 @@ void loadConfig(JsonDocument &cfg, int argc, char **argv) {
   cfg["serial"]["frame"] = "CRLF";
   cfg["broker"]["host"] = "localhost";
   cfg["broker"]["port"] = 6379;
+  cfb["proxy"]["timeout"] = 5000;
   // override args
   int c;
-  while ((c = getopt(argc, argv, "h:p:s:b:")) != -1) switch (c) {
+  while ((c = getopt(argc, argv, "h:p:s:b:f:t:")) != -1) switch (c) {
       case 'b':
         cfg["serial"]["baudrate"] = atoi(optarg);
         break;
@@ -43,6 +44,9 @@ void loadConfig(JsonDocument &cfg, int argc, char **argv) {
         break;
       case 'p':
         cfg["broker"]["port"] = atoi(optarg);
+        break;
+      case 't':
+        cfg["proxy"]["timeout"] = atoi(optarg);
         break;
       case '?':
         printf("Usage %s -h <host> -p <port> -s <serial_port> -b <baudrate>\n",
@@ -71,9 +75,9 @@ int main(int argc, char **argv) {
   redis.init();
   redis.connect();
 
-  SessionSerial serialSession(workerThread, config["serial"].as<JsonObject>());
-  serialSession.init();
-  serialSession.connect();
+  SessionSerial serial(workerThread, config["serial"].as<JsonObject>());
+  serial.init();
+  serial.connect();
 
   Framing crlf("\r\n", 10000);
   PPP ppp(1024);
@@ -104,14 +108,13 @@ int main(int argc, char **argv) {
   std::string framing = config["serial"]["frame"] | "crlf";
 
   if (framing == "crlf") {
-    serialSession.incoming() >> crlf.deframe() >> bytesToJson >>
-        redis.request();
+    serial.incoming() >> crlf.deframe() >> bytesToJson >> redis.request();
+    redis.response() >> jsonToBytes >> crlf.frame() >> serial.outgoing();
 
-    redis.response() >> jsonToBytes >> crlf.frame() >> serialSession.outgoing();
   } else if (framing == "ppp") {
-    serialSession.incoming() >> ppp.deframe() >> bytesToJson >> redis.request();
+    serial.incoming() >> ppp.deframe() >> bytesToJson >> redis.request();
+    redis.response() >> jsonToBytes >> ppp.frame() >> serial.outgoing();
 
-    redis.response() >> jsonToBytes >> ppp.frame() >> serialSession.outgoing();
   } else {
     WARN("unknown framing");
     exit(-1);
