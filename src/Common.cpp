@@ -1,6 +1,9 @@
 #include <Common.h>
 
 void replyToJson(JsonVariant result, redisReply *reply) {
+  if ( reply==0 ){
+    result=nullptr;
+  };
   switch (reply->type) {
     case REDIS_REPLY_STATUS:
     case REDIS_REPLY_ERROR:

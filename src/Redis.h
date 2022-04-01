@@ -16,6 +16,7 @@ class Redis : public Actor {
   uint16_t _redisPort;
   Json _docIn;
   bool _reconnectOnConnectionLoss;
+  bool _addReplyContext;
 
  public:
   Redis(Thread &thread, JsonObject config);

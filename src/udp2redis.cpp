@@ -20,6 +20,17 @@
 Log logger;
 
 //====================================================
+std::string loadFile(const char *name);
+
+void deepMerge(JsonVariant dst, JsonVariantConst src) {
+  if (src.is<JsonObject>()) {
+    for (auto kvp : src.as<JsonObject>()) {
+      merge(dst.getOrAddMember(kvp.key()), kvp.value());
+    }
+  } else {
+    dst.set(src);
+  }
+}
 
 bool loadConfig(JsonObject cfg, int argc, char **argv) {
   cfg["udp"]["port"] = 9999;
@@ -30,9 +41,16 @@ bool loadConfig(JsonObject cfg, int argc, char **argv) {
 
   // override args
   int c;
-  while ((c = getopt(argc, argv, "h:p:n:u:t:")) != -1) switch (c) {
+  while ((c = getopt(argc, argv, "h:p:n:u:t:f:")) != -1) {
+    switch (c) {
       case 'u':
         cfg["udp"]["port"] = atoi(optarg);
+        break;
+      case 'f':
+        std::string s = loadFile(optarg);
+        DynamicJsonObject doc(10240);
+        deserializeJson(doc, s);
+        deepMerge(cfg, doc);
         break;
       case 'n':
         cfg["udp"]["net"] = optarg;
@@ -55,6 +73,7 @@ bool loadConfig(JsonObject cfg, int argc, char **argv) {
              argv[0]);
         abort();
     }
+  }
   std::string str;
   serializeJson(cfg, str);
   INFO("%s", str.c_str());
@@ -184,11 +203,11 @@ int main(int argc, char **argv) {
     // connect instrance to UdpMsg Stream
   };
 
-// cleanup inactive clients 
+  // cleanup inactive clients
 
-  TimerSource ts(workerThread, proxyTimeout , true);
+  TimerSource ts(workerThread, proxyTimeout, true);
   ts >> [&](const TimerMsg &) {
-    INFO(" active clients : %d ",clients.size());
+    INFO(" active clients : %d ", clients.size());
     auto itr = clients.begin();
     while (itr != clients.end()) {
       if (itr->second->lastMessage() < (Sys::millis() - 5000)) {

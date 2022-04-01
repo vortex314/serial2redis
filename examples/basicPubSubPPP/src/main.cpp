@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <Common.h>
+
 #include <cstdarg>
 
 #include "../../../limero/limero.cpp"
@@ -23,12 +24,15 @@ DynamicJsonDocument docIn(256);
 PPP ppp;
 class SerialSession {
  public:
-   ValueFlow<Bytes> _rxd; 
-   SinkFunction<Bytes> _txd;
-   SerialSession
+  ValueFlow<Bytes> _rxd;
+  SinkFunction<Bytes> _txd;
+  SerialSession
 
-  Source<Bytes> rxd() { return _rxd;};
-  Sink<Bytes> txd() { return _txd;};
+      Source<Bytes>
+      rxd() {
+    return _rxd;
+  };
+  Sink<Bytes> txd() { return _txd; };
 } serialSession;
 
 Flow<Bytes, Json> *bytesToJson;
@@ -45,15 +49,11 @@ void serialEvent1() {
 }
 
 class RedisClient {
-
   Sink<Json> in();
   Source<Json> out();
-
 };
 
-void setup() {
-  pinMode(LED_BUILTIN, OUTPUT);
-  UART.begin(921600);
+class JsonSerializer {
   Flow<Bytes, Json> bytesToJson =
       new LambdaFlow<Bytes, Json>([&](Json &docIn, const Bytes &frame) {
         std::string s = std::string(frame.begin(), frame.end());
@@ -76,8 +76,21 @@ void setup() {
         msg = Bytes(str.begin(), str.end());
         return str.size() > 0;
       });
-    serialSession.rxd() >> ppp.deframe() >> bytesToJson >> redisReplies;
-    redisRequests >> jsonToBytes >> ppp.frame() >> serialSession.txd(); 
+
+ public:
+  Flow<Bytes, Json> deserialize() { return bytesToJson; };
+  Flow<Json, Bytes> serialize() { return jsonToBytes(); };
+} json;
+
+void setup() {
+  pinMode(LED_BUILTIN, OUTPUT);
+  UART.begin(921600);
+
+  serialSession.rxd() >> ppp.deframe() >> json.deserialize() >> redisReplies;
+  redisRequests >> json.serialize() >> ppp.frame() >> serialSession.txd();
+
+  redisReplies >>
+      [&](const Json &js) { Serial.println(" received REDIS reply "); };
 }
 
 void publish(const char *key, uint32_t value) {
