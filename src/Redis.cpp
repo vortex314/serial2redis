@@ -6,7 +6,6 @@ struct RedisReplyContext {
 };
 
 void Redis::addWriteFd(void *pv) {
-  //  INFO("addWriteFd %X", pv);
   Redis *redis = (Redis *)pv;
   redis->thread().addWriteInvoker(
       redis->_ac->c.fd, [redis](int) { redisAsyncHandleWrite(redis->_ac); });
@@ -14,26 +13,23 @@ void Redis::addWriteFd(void *pv) {
 
 void Redis::addReadFd(void *pv) {
   Redis *redis = (Redis *)pv;
-  //  INFO("addReadFd %X", pv);
   redis->thread().addReadInvoker(
       redis->_ac->c.fd, [redis](int) { redisAsyncHandleRead(redis->_ac); });
 }
 
 void Redis::delWriteFd(void *pv) {
   Redis *redis = (Redis *)pv;
-  //  INFO("delWriteFd %X ", pv);
   redis->thread().deleteInvoker(redis->_ac->c.fd);
 }
 
 void Redis::delReadFd(void *pv) {
-  //  INFO("delReadFd %X", pv);
   Redis *redis = (Redis *)pv;
   redis->thread().deleteInvoker(redis->_ac->c.fd);
 }
 
 void Redis::cleanupFd(void *pv) {
-  //  INFO("cleanupFd %X", pv);
   Redis *redis = (Redis *)pv;
+  if (redis->_ac->c.fd<0 ) return;
   redis->thread().deleteInvoker(redis->_ac->c.fd);
 }
 
@@ -45,21 +41,18 @@ Redis::Redis(Thread &thread, JsonObject config)
   _redisPort = config["port"] | 6379;
   _ac = 0;
   _reconnectOnConnectionLoss = true;
-  _addReplyContext = false;
+  _addReplyContext = true;
 };
 
 Redis::~Redis() {
   INFO("~Redis()");
   _reconnectOnConnectionLoss = false;
-  // thread().deleteInvoker(_ac->c.fd);
-
-  // redisAsyncSetDisconnectCallback(_ac, NULL); // this doens't work a second
-  // time redisAsyncSetConnectCallback(_ac, NULL);
   if (_connected) disconnect();
-  //  if (_ac) redisAsyncFree(_ac);
+  cleanupFd(this);
 }
 
-void Redis::onPush(redisAsyncContext *c, void *reply) {
+void Redis::onPush(void *pac, void *reply) {
+  redisAsyncContext *ac = (redisAsyncContext *)pac;
   INFO(" PUSH received ");
 }
 
@@ -68,30 +61,27 @@ int Redis::connect() {
   redisOptions options = {0};
   REDIS_OPTIONS_SET_TCP(&options, _redisHost.c_str(), _redisPort);
   options.connect_timeout = new timeval{3, 0};  // 3 sec
-  options.command_timeout = new timeval{3, 0};  // 3 sec
+  options.push_cb = onPush;
   REDIS_OPTIONS_SET_PRIVDATA(&options, this, free_privdata);
-  //    redisAsyncInitialize()
-  _ac = redisAsyncConnect(Sys::hostname(), 6379);
+  _ac = redisAsyncConnectWithOptions(&options);
 
   if (_ac == NULL || _ac->err) {
     INFO(" Connection %s:%d failed", _redisHost.c_str(), _redisPort);
     return ENOTCONN;
   }
   _ac->c.privdata = this;
-  redisAsyncSetConnectCallback(_ac,
-                               [](const redisAsyncContext *ac, int status) {
-                                 INFO("REDIS %X connected : %d", ac, status);
-                                 Redis *me = (Redis *)ac->c.privdata;
-                                 me->_connected = true;
-                               });
-  redisAsyncSetPushCallback(_ac, onPush);
+  redisAsyncSetConnectCallback(
+      _ac, [](const redisAsyncContext *ac, int status) {
+        INFO("REDIS %X connected : %d fd : %d ", ac, status, ac->c.fd);
+        Redis *me = (Redis *)ac->c.privdata;
+        me->_connected = true;
+      });
 
   int rc = redisAsyncSetDisconnectCallback(
       _ac, [](const redisAsyncContext *ac, int status) {
         WARN("REDIS disconnected : %d", status);
         Redis *me = (Redis *)ac->c.privdata;
         me->_connected = false;
-        //  me->thread().deleteInvoker(me->_ac->c.fd);
         if (me->_reconnectOnConnectionLoss) me->connect();
       });
 
@@ -123,30 +113,42 @@ void Redis::disconnect() {
   _connected = false;
 }
 
-void Redis::replyHandler(redisAsyncContext *c, void *repl, void *pv) {
-  RedisReplyContext *redisReplyContext = (RedisReplyContext *)pv;
-  Redis *redis = redisReplyContext->me;
+void Redis::replyHandler(redisAsyncContext *ac, void *repl, void *pv) {
   redisReply *reply = (redisReply *)repl;
   Json doc;
+  if (reply == 0) return;  // disconnect ?
+  if (reply->type == REDIS_REPLY_PUSH &&
+      strcmp(reply->element[0]->str, "pmessage") == 0) {  // no context
+    Redis *redis = (Redis *)ac->c.privdata;
+    replyToJson(doc.as<JsonVariant>(), reply);
+    std::string str;
+    serializeJson(doc, str);
+    INFO(" push %s ", str.c_str());
+    redis->_response.on(doc);
+    return;
+  }
 
-  if (_addReplyContext) {
+  RedisReplyContext *redisReplyContext = (RedisReplyContext *)pv;
+  Redis *redis = redisReplyContext->me;
+
+  if (redis->_addReplyContext) {
     doc[0] = redisReplyContext->command;
-    replyToJson(doc[1].as<JsonVariant>(), reply);
+    replyToJson(doc[1].to<JsonVariant>(), reply);
   } else {
     replyToJson(doc.as<JsonVariant>(), reply);
   }
 
-  redis->_response.on(doc);
-  
   std::string str;
   serializeJson(doc, str);
   INFO(" reply on %s : %s ", redisReplyContext->command.c_str(), str.c_str());
   delete redisReplyContext;
 }
 
-
 void Redis::init() {
   _request >> new SinkFunction<Json>([&](const Json &docIn) {
+    std::string s;
+    serializeJson(docIn, s);
+    INFO("Redis:request  %s ", s.c_str());
     if (!_connected || !docIn.is<JsonArray>()) return;
     Json *js = (Json *)&docIn;
     JsonArray array = js->as<JsonArray>();
@@ -160,7 +162,6 @@ void Redis::init() {
     redisAsyncCommandArgv(_ac, replyHandler,
                           new RedisReplyContext{argv[0], this}, argc, argv,
                           NULL);
-    redisAsyncWrite(_ac);
   });
 }
 

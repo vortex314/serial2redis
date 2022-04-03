@@ -1,7 +1,6 @@
 
 #include <Udp.h>
 #include <Log.h>
-//#include <util.h>
 #include <StringUtility.h>
 
 int Udp::init() {
@@ -77,18 +76,6 @@ int Udp::send(const UdpMsg &udpMsg) {
   return 0;
 }
 
-/*
-int main(int argc,char* argv[]) {
-        Udp udp;
-        udp.port(1883);
-        UdpMsg udpMsg;
-        udpMsg.dstIp("192.168.0.195");
-        udpMsg.dstPort(4210);
-        udpMsg.message=">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-"; udp.init(); udp.send(udpMsg); UdpMsg rcvMsg; udp.receive(rcvMsg);
-        printf("received : '%s'\n",rcvMsg.message.c_str());
-}
-*/
 #include <arpa/inet.h>
 #include <errno.h>   //For errno - the error number
 #include <netdb.h>   //hostent

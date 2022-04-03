@@ -23,10 +23,10 @@ void loadConfig(JsonDocument &cfg, int argc, char **argv) {
   // defaults
   cfg["serial"]["port"] = "/dev/ttyUSB0";
   cfg["serial"]["baudrate"] = 115200;
-  cfg["serial"]["frame"] = "CRLF";
+  cfg["serial"]["frame"] = "crlf";
   cfg["broker"]["host"] = "localhost";
   cfg["broker"]["port"] = 6379;
-  cfb["proxy"]["timeout"] = 5000;
+  cfg["proxy"]["timeout"] = 5000;
   // override args
   int c;
   while ((c = getopt(argc, argv, "h:p:s:b:f:t:")) != -1) switch (c) {
@@ -100,7 +100,7 @@ int main(int argc, char **argv) {
       new LambdaFlow<Json, Bytes>([&](Bytes &msg, const Json &docIn) {
         std::string str;
         size_t sz = serializeJson(docIn, str);
-        //        INFO("TXD : '%s'", str.c_str());
+                INFO("TXD : '%s'", str.c_str());
         msg = Bytes(str.begin(), str.end());
         return str.size() > 0;
       });
@@ -116,7 +116,7 @@ int main(int argc, char **argv) {
     redis.response() >> jsonToBytes >> ppp.frame() >> serial.outgoing();
 
   } else {
-    WARN("unknown framing");
+    WARN("unknown framing : %s ",framing.c_str());
     exit(-1);
   }
 

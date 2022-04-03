@@ -25,7 +25,7 @@ std::string loadFile(const char *name);
 void deepMerge(JsonVariant dst, JsonVariantConst src) {
   if (src.is<JsonObject>()) {
     for (auto kvp : src.as<JsonObject>()) {
-      merge(dst.getOrAddMember(kvp.key()), kvp.value());
+      deepMerge(dst.getOrAddMember(kvp.key()), kvp.value());
     }
   } else {
     dst.set(src);
@@ -34,7 +34,7 @@ void deepMerge(JsonVariant dst, JsonVariantConst src) {
 
 bool loadConfig(JsonObject cfg, int argc, char **argv) {
   cfg["udp"]["port"] = 9999;
-  cfg["udp"]["host"] = "0.0.0.0";
+  cfg["udp"]["net"] = "0.0.0.0";
   cfg["redis"]["host"] = "localhost";
   cfg["redis"]["port"] = 6379;
   cfg["proxy"]["timeout"] = 5000;
@@ -46,12 +46,13 @@ bool loadConfig(JsonObject cfg, int argc, char **argv) {
       case 'u':
         cfg["udp"]["port"] = atoi(optarg);
         break;
-      case 'f':
+      case 'f': {
         std::string s = loadFile(optarg);
-        DynamicJsonObject doc(10240);
+        DynamicJsonDocument doc(10240);
         deserializeJson(doc, s);
         deepMerge(cfg, doc);
         break;
+      }
       case 'n':
         cfg["udp"]["net"] = optarg;
         break;
@@ -86,7 +87,6 @@ class ClientProxy : public Actor {
   QueueFlow<std::string> _incoming;
   QueueFlow<std::string> _outgoing;
   String nodeName;
-  redisAsyncContext *_ac;
   std::string _node;
   bool _connected;
   std::string _redisHost;
@@ -167,7 +167,9 @@ int main(int argc, char **argv) {
   udpSession.init();
   udpSession.connect();
   UdpAddress serverAddress;
-  UdpAddress::fromUri(serverAddress, "0.0.0.0:9999");
+  UdpAddress::fromUri(serverAddress,
+                      udpConfig["net"].as<std::string>() + ":" +
+                          std::to_string(udpConfig["port"].as<int>()));
   INFO("%s", serverAddress.toString().c_str());
 
   udpSession.recv() >> [&](const UdpMsg &udpMsg) {
@@ -178,6 +180,7 @@ int main(int argc, char **argv) {
 
     UdpAddress udpSource = udpMsg.src;
     ClientProxy *clientProxy;
+
     auto it = clients.find(udpSource);
     if (it == clients.end()) {
       clientProxy = new ClientProxy(workerThread, brokerConfig, udpSource);
@@ -193,14 +196,12 @@ int main(int argc, char **argv) {
                  .c_str());
         udpSession.send().on(msg);
       };
-      clients.emplace(udpSource, clientProxy);
+      clients.insert(std::pair<UdpAddress,ClientProxy*>(udpSource, clientProxy));
       clientProxy->connect();
     } else {
       clientProxy = it->second;
     }
     clientProxy->incoming().on(payload);
-    // create new instance for broker connection
-    // connect instrance to UdpMsg Stream
   };
 
   // cleanup inactive clients

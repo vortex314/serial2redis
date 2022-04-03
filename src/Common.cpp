@@ -1,8 +1,8 @@
 #include <Common.h>
 
 void replyToJson(JsonVariant result, redisReply *reply) {
-  if ( reply==0 ){
-    result=nullptr;
+  if (reply == 0) {
+    result.set(nullptr);
   };
   switch (reply->type) {
     case REDIS_REPLY_STATUS:
@@ -41,6 +41,10 @@ void replyToJson(JsonVariant result, redisReply *reply) {
       for (int i = 0; i < reply->elements; i++)
         replyToJson(result.addElement(), reply->element[i]);
       break;
+    default: {
+      result.set(" Unhandled reply to JSON type");
+      break;
+    }
   }
 }
 
