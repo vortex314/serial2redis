@@ -3,17 +3,13 @@
         {
             "name": "ESP32",
             "includePath": [
-                "/usr/local/include",
                 "${workspaceFolder}/../limero/inc/",
                 "${workspaceFolder}/../ArduinoJson/src",
                 "${workspaceFolder}/hiredis",
-                "${workspaceFolder}/src/",
+                "${workspaceFolder}/src"
             ],
             "defines": [
-                "NOTHING",
                 "__linux__",
-                "ZMQ_BUILD_DRAFT_API",
-                "ZENOH_LINUX",
                 "BROKER_REDIS"
             ],
             "compilerPath": "/usr/bin/gcc",

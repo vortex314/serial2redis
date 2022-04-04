@@ -1,4 +1,5 @@
 #include <Redis.h>
+#include <assert.h>
 
 struct RedisReplyContext {
   std::string command;
@@ -43,10 +44,11 @@ Redis::Redis(Thread &thread, JsonObject config)
   _redisHost = config["host"] | "localhost";
   _redisPort = config["port"] | 6379;
   _reconnectOnConnectionLoss = config["reconnectOnConnectionLoss"] | true;
-  _addReplyContext = config["addReplyContext"] | true;
+  _addReplyContext = config["addReplyContext"] | false;
   _ac = 0;
 
   _jsonToRedis = new SinkFunction<Json>([&](const Json &docIn) {
+    if (!_connected) return;
     std::string s;
     serializeJson(docIn, s);
     INFO("Redis:request  %s ", s.c_str());
@@ -79,17 +81,16 @@ void Redis::free_privdata(void *pvdata) {
   WARN(" freeing private data of context %X", pvdata);
 }
 
-void Redis::onPush(void *pac, void *reply) {
-  redisAsyncContext *ac = (redisAsyncContext *)pac;
-  INFO(" PUSH received "); // why do I never come here ???? 
+void Redis::onPush(redisAsyncContext *ac, void *reply) {
+  INFO(" PUSH received ");  // why do I never come here ????
 }
 
 int Redis::connect() {
-  INFO("Connecting to Redis %s:%d.", _redisHost.c_str(), _redisPort);
+  INFO("Connecting to Redis %s:%d ... ", _redisHost.c_str(), _redisPort);
   redisOptions options = {0};
   REDIS_OPTIONS_SET_TCP(&options, _redisHost.c_str(), _redisPort);
   options.connect_timeout = new timeval{3, 0};  // 3 sec
-  options.push_cb = onPush;
+  options.async_push_cb = onPush;
   REDIS_OPTIONS_SET_PRIVDATA(&options, this, free_privdata);
   _ac = redisAsyncConnectWithOptions(&options);
 
@@ -97,21 +98,6 @@ int Redis::connect() {
     INFO(" Connection %s:%d failed", _redisHost.c_str(), _redisPort);
     return ENOTCONN;
   }
-  _ac->c.privdata = this;
-  redisAsyncSetConnectCallback(
-      _ac, [](const redisAsyncContext *ac, int status) {
-        INFO("REDIS %X connected : %d fd : %d ", ac, status, ac->c.fd);
-        Redis *me = (Redis *)ac->c.privdata;
-        me->_connected = true;
-      });
-
-  int rc = redisAsyncSetDisconnectCallback(
-      _ac, [](const redisAsyncContext *ac, int status) {
-        WARN("REDIS disconnected : %d", status);
-        Redis *me = (Redis *)ac->c.privdata;
-        me->_connected = false;
-        if (me->_reconnectOnConnectionLoss) me->connect();
-      });
 
   _ac->ev.addRead = addReadFd;
   _ac->ev.delRead = delReadFd;
@@ -119,6 +105,28 @@ int Redis::connect() {
   _ac->ev.delWrite = delWriteFd;
   _ac->ev.cleanup = cleanupFd;
   _ac->ev.data = this;
+
+  int rc = redisAsyncSetConnectCallback(
+      _ac, [](const redisAsyncContext *ac, int status) {
+        INFO("Redis connected status : %d fd : %d ", ac, status, ac->c.fd);
+        Redis *me = (Redis *)ac->c.privdata;
+        me->_connected = true;
+      });
+
+  assert(rc == 0);
+
+  rc = redisAsyncSetDisconnectCallback(
+      _ac, [](const redisAsyncContext *ac, int status) {
+        WARN("Redis disconnected status : %d", status);
+        Redis *me = (Redis *)ac->c.privdata;
+        me->_connected = false;
+        if (me->_reconnectOnConnectionLoss) me->connect();
+      });
+
+  assert(rc == 0);
+
+  auto oldFn = redisAsyncSetPushCallback(_ac,onPush);
+
   return 0;
 }
 

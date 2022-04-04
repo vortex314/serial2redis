@@ -8,8 +8,6 @@
 #include <SessionUdp.h>
 #include <StringUtility.h>
 #include <Udp.h>
-#include <async.h>
-#include <hiredis.h>
 #include <stdio.h>
 
 #include <map>
@@ -142,7 +140,6 @@ class ClientProxy : public Actor {
 
   void disconnect() { _redis.disconnect(); }
 
-  void init() {}
   Sink<std::string> &incoming() { return _incoming; }
   Source<std::string> &outgoing() { return _outgoing; }
   UdpAddress src() { return _sourceAddress; }
@@ -183,7 +180,6 @@ int main(int argc, char **argv) {
     auto it = clients.find(udpSource);
     if (it == clients.end()) {
       clientProxy = new ClientProxy(workerThread, brokerConfig, udpSource);
-      clientProxy->init();
       clientProxy->outgoing() >> [&, clientProxy](const std::string &bs) {
         UdpMsg msg;
         msg.message = std::vector<uint8_t>(bs.data(), bs.data() + bs.size());
@@ -195,7 +191,8 @@ int main(int argc, char **argv) {
                  .c_str());
         udpSession.send().on(msg);
       };
-      clients.insert(std::pair<UdpAddress,ClientProxy*>(udpSource, clientProxy));
+      clients.insert(
+          std::pair<UdpAddress, ClientProxy *>(udpSource, clientProxy));
       clientProxy->connect();
     } else {
       clientProxy = it->second;
