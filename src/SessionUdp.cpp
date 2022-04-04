@@ -28,7 +28,7 @@ bool SessionUdp::connect() {
 }
 
 bool SessionUdp::disconnect() {
-  thread().deleteInvoker(_udp.fd());
+  thread().delAllInvoker(_udp.fd());
   _udp.deInit();
   return true;
 }

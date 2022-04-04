@@ -28,7 +28,7 @@ bool SessionSerial::connect() {
 }
 
 bool SessionSerial::disconnect() {
-  thread().deleteInvoker(_serialPort.fd());
+  thread().delAllInvoker(_serialPort.fd());
   _serialPort.disconnect();
   return true;
 }

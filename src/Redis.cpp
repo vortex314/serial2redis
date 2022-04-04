@@ -9,23 +9,25 @@ struct RedisReplyContext {
 void Redis::addWriteFd(void *pv) {
   Redis *redis = (Redis *)pv;
   redis->thread().addWriteInvoker(
-      redis->_ac->c.fd, [redis](int) { redisAsyncHandleWrite(redis->_ac); });
+      redis->_ac->c.fd, [redis](int) { 
+        redisAsyncHandleWrite(redis->_ac); });
 }
 
 void Redis::addReadFd(void *pv) {
   Redis *redis = (Redis *)pv;
   redis->thread().addReadInvoker(
-      redis->_ac->c.fd, [redis](int) { redisAsyncHandleRead(redis->_ac); });
+      redis->_ac->c.fd, [redis](int) { 
+        redisAsyncHandleRead(redis->_ac); });
 }
 
 void Redis::delWriteFd(void *pv) {
   Redis *redis = (Redis *)pv;
-  redis->thread().deleteInvoker(redis->_ac->c.fd);
+  redis->thread().delWriteInvoker(redis->_ac->c.fd);
 }
 
 void Redis::delReadFd(void *pv) {
   Redis *redis = (Redis *)pv;
-  redis->thread().deleteInvoker(redis->_ac->c.fd);
+  redis->thread().delReadInvoker(redis->_ac->c.fd);
 }
 
 void Redis::cleanupFd(void *pv) {
@@ -34,7 +36,7 @@ void Redis::cleanupFd(void *pv) {
     WARN(" cleanupFd for negative fd");
     return;
   }
-  redis->thread().deleteInvoker(redis->_ac->c.fd);
+  redis->thread().delAllInvoker(redis->_ac->c.fd);
 }
 
 Redis::Redis(Thread &thread, JsonObject config)
@@ -108,7 +110,7 @@ int Redis::connect() {
 
   int rc = redisAsyncSetConnectCallback(
       _ac, [](const redisAsyncContext *ac, int status) {
-        INFO("Redis connected status : %d fd : %d ", ac, status, ac->c.fd);
+        INFO("Redis connected status : %d fd : %d ", status, ac->c.fd);
         Redis *me = (Redis *)ac->c.privdata;
         me->_connected = true;
       });
@@ -117,7 +119,8 @@ int Redis::connect() {
 
   rc = redisAsyncSetDisconnectCallback(
       _ac, [](const redisAsyncContext *ac, int status) {
-        WARN("Redis disconnected status : %d", status);
+        WARN("Redis disconnected status : %d fd : %d ", status, ac->c.fd)
+
         Redis *me = (Redis *)ac->c.privdata;
         me->_connected = false;
         if (me->_reconnectOnConnectionLoss) me->connect();
@@ -125,7 +128,7 @@ int Redis::connect() {
 
   assert(rc == 0);
 
-  auto oldFn = redisAsyncSetPushCallback(_ac,onPush);
+  auto oldFn = redisAsyncSetPushCallback(_ac, onPush);
 
   return 0;
 }
