@@ -126,7 +126,6 @@ class ClientProxy : public Actor {
 
     _incoming.async(thread);
     _outgoing.async(thread);
-    _redis.init();
 
     _redis.response() >> _jsonToString >> _outgoing;
     _incoming >> _stringToJson >> _redis.request();
@@ -215,6 +214,7 @@ int main(int argc, char **argv) {
         INFO(" deleting client after timeout.");
         ClientProxy *proxy = itr->second;
         itr = clients.erase(itr);
+        proxy->disconnect();
         delete proxy;
         INFO("cleanup done");
       } else {

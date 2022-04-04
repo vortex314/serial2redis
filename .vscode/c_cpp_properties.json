@@ -5,7 +5,7 @@
             "includePath": [
                 "/usr/local/include",
                 "${workspaceFolder}/../limero/inc/",
-                "${workspaceFolder}/../ArduinoJson/src/",
+                "${workspaceFolder}/../ArduinoJson/src",
                 "${workspaceFolder}/hiredis",
                 "${workspaceFolder}/src/",
             ],

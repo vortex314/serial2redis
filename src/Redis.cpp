@@ -29,7 +29,10 @@ void Redis::delReadFd(void *pv) {
 
 void Redis::cleanupFd(void *pv) {
   Redis *redis = (Redis *)pv;
-  if (redis->_ac->c.fd<0 ) return;
+  if (redis->_ac->c.fd < 0) {
+    WARN(" cleanupFd for negative fd");
+    return;
+  }
   redis->thread().deleteInvoker(redis->_ac->c.fd);
 }
 
@@ -39,9 +42,29 @@ Redis::Redis(Thread &thread, JsonObject config)
   _response.async(thread);
   _redisHost = config["host"] | "localhost";
   _redisPort = config["port"] | 6379;
+  _reconnectOnConnectionLoss = config["reconnectOnConnectionLoss"] | true;
+  _addReplyContext = config["addReplyContext"] | true;
   _ac = 0;
-  _reconnectOnConnectionLoss = true;
-  _addReplyContext = true;
+
+  _jsonToRedis = new SinkFunction<Json>([&](const Json &docIn) {
+    std::string s;
+    serializeJson(docIn, s);
+    INFO("Redis:request  %s ", s.c_str());
+    if (!_connected || !docIn.is<JsonArray>()) return;
+    Json *js = (Json *)&docIn;
+    JsonArray array = js->as<JsonArray>();
+    const char *argv[100];
+    int argc;
+    for (int i = 0; i < array.size(); i++) {
+      if (!array[i].is<const char *>()) return;
+      argv[i] = array[i].as<const char *>();
+    }
+    argc = array.size();
+    redisAsyncCommandArgv(_ac, replyHandler,
+                          new RedisReplyContext{argv[0], this}, argc, argv,
+                          NULL);
+  });
+  _request >> _jsonToRedis;
 };
 
 Redis::~Redis() {
@@ -49,11 +72,16 @@ Redis::~Redis() {
   _reconnectOnConnectionLoss = false;
   if (_connected) disconnect();
   cleanupFd(this);
+  delete _jsonToRedis;
+}
+
+void Redis::free_privdata(void *pvdata) {
+  WARN(" freeing private data of context %X", pvdata);
 }
 
 void Redis::onPush(void *pac, void *reply) {
   redisAsyncContext *ac = (redisAsyncContext *)pac;
-  INFO(" PUSH received ");
+  INFO(" PUSH received "); // why do I never come here ???? 
 }
 
 int Redis::connect() {
@@ -91,32 +119,21 @@ int Redis::connect() {
   _ac->ev.delWrite = delWriteFd;
   _ac->ev.cleanup = cleanupFd;
   _ac->ev.data = this;
-  /*
-    thread().addErrorInvoker(_ac->c.fd, [&](int) { WARN(" error on fd "); });
-    thread().addReadInvoker(_ac->c.fd, [&](int) {
-      //    INFO("READ");
-      redisAsyncHandleRead(_ac);
-    });
-      thread().addWriteInvoker(_ac->c.fd, [&](int) {
-        INFO("WRITE");
-        redisAsyncHandleWrite(_ac);
-        }); */
-  //  redisAsyncWrite(_ac);
-
-  _connected = true;
   return 0;
 }
 
 void Redis::disconnect() {
   INFO(" disconnect called");
   redisAsyncDisconnect(_ac);
-  _connected = false;
 }
 
 void Redis::replyHandler(redisAsyncContext *ac, void *repl, void *pv) {
   redisReply *reply = (redisReply *)repl;
   Json doc;
-  if (reply == 0) return;  // disconnect ?
+  if (reply == 0) {
+    WARN(" replyHandler caught null ");
+    return;  // disconnect ?
+  };
   if (reply->type == REDIS_REPLY_PUSH &&
       strcmp(reply->element[0]->str, "pmessage") == 0) {  // no context
     Redis *redis = (Redis *)ac->c.privdata;
@@ -142,27 +159,6 @@ void Redis::replyHandler(redisAsyncContext *ac, void *repl, void *pv) {
   serializeJson(doc, str);
   INFO(" reply on %s : %s ", redisReplyContext->command.c_str(), str.c_str());
   delete redisReplyContext;
-}
-
-void Redis::init() {
-  _request >> new SinkFunction<Json>([&](const Json &docIn) {
-    std::string s;
-    serializeJson(docIn, s);
-    INFO("Redis:request  %s ", s.c_str());
-    if (!_connected || !docIn.is<JsonArray>()) return;
-    Json *js = (Json *)&docIn;
-    JsonArray array = js->as<JsonArray>();
-    const char *argv[100];
-    int argc;
-    for (int i = 0; i < array.size(); i++) {
-      if (!array[i].is<const char *>()) return;
-      argv[i] = array[i].as<const char *>();
-    }
-    argc = array.size();
-    redisAsyncCommandArgv(_ac, replyHandler,
-                          new RedisReplyContext{argv[0], this}, argc, argv,
-                          NULL);
-  });
 }
 
 Sink<Json> &Redis::request() { return _request; }

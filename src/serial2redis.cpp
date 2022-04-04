@@ -72,7 +72,6 @@ int main(int argc, char **argv) {
   Thread workerThread("worker");
 
   Redis redis(workerThread, config["broker"].as<JsonObject>());
-  redis.init();
   redis.connect();
 
   SessionSerial serial(workerThread, config["serial"].as<JsonObject>());

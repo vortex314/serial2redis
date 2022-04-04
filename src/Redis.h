@@ -16,15 +16,15 @@ class Redis : public Actor {
   Json _docIn;
   bool _reconnectOnConnectionLoss;
   bool _addReplyContext;
+  SinkFunction<Json> _jsonToRedis;
 
  public:
   Redis(Thread &thread, JsonObject config);
   ~Redis();
-  void init();
 
   static void onPush(void *c, void *reply);
   static void replyHandler(redisAsyncContext *c, void *reply, void *me);
-  static void free_privdata(void *pvdata) {}
+  static void free_privdata(void *pvdata) ;
 
   int connect();
   void disconnect();
