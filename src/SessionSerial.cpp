@@ -3,7 +3,6 @@
 
 SessionSerial::SessionSerial(Thread &thread, JsonObject config)
     : Actor(thread) {
-  _errorInvoker = new SerialSessionError(*this);
   _port = config["port"] | "/dev/ttyUSB0";
   _baudrate = config["baudrate"] | 115200;
 }
@@ -13,8 +12,8 @@ bool SessionSerial::init() {
   _serialPort.baudrate(_baudrate);
   _serialPort.init();
   _outgoingFrame >> [&](const Bytes &data) {
-   // INFO("TXD  %s => [%d] %s", _serialPort.port().c_str(),data.size(),
-   //    hexDump(data).c_str());
+    // INFO("TXD  %s => [%d] %s", _serialPort.port().c_str(),data.size(),
+    //    hexDump(data).c_str());
     _serialPort.txd(data);
   };
   return true;
@@ -22,7 +21,7 @@ bool SessionSerial::init() {
 
 bool SessionSerial::connect() {
   if (_serialPort.connect() != 0) return false;
-  thread().addReadInvoker(_serialPort.fd(), [&](int) { invoke(); });
+  thread().addReadInvoker(_serialPort.fd(), [&](int) { onRead(); });
   thread().addErrorInvoker(_serialPort.fd(), [&](int) { onError(); });
   return true;
 }
@@ -33,17 +32,12 @@ bool SessionSerial::disconnect() {
   return true;
 }
 // on data incoming on filedescriptor
-void SessionSerial::invoke() {
+void SessionSerial::onRead() {
   int rc = _serialPort.rxd(_rxdBuffer);
   if (rc == 0) {                   // read ok
     if (_rxdBuffer.size() == 0) {  // but no data
       WARN(" 0 data => connection lost ");
-      disconnect();
-      while (true) {
-        sleep(1);
-        if (connect()) break;
-        INFO(" reconnecting...");
-      };
+      reconnect();
     } else {
       _incomingFrame.on(_rxdBuffer);
     }
@@ -52,7 +46,16 @@ void SessionSerial::invoke() {
 // on error issue onf ile descriptor
 void SessionSerial::onError() {
   INFO(" error occured on serial ,disconnecting ");
+  reconnect();
+}
+
+void SessionSerial::reconnect() {
   disconnect();
+  while (true) {
+    sleep(1);
+    if (connect()) break;
+    INFO(" reconnecting...");
+  };
 }
 
 int SessionSerial::fd() { return _serialPort.fd(); }

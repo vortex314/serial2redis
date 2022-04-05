@@ -98,7 +98,7 @@ void PPP::addEscaped(Bytes &out, uint8_t c) {
 }
 
 PPP::PPP(size_t maxFrameLength) : _maxFrameLength(maxFrameLength) {
-  _frame = *new LambdaFlow<Bytes, Bytes>([&](Bytes &out, const Bytes &in) {
+  _frame = LambdaFlow<Bytes, Bytes>([&](Bytes &out, const Bytes &in) {
     Fcs fcs;
     out.clear();
     out.push_back(PPP_FLAG_CHAR);
@@ -113,6 +113,10 @@ PPP::PPP(size_t maxFrameLength) : _maxFrameLength(maxFrameLength) {
   });
 
   _deframe = new PppDeframer(maxFrameLength);
+}
+
+PPP::~PPP(){
+  delete _deframe;
 }
 
 void PPP::request(){};

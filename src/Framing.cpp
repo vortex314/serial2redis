@@ -40,5 +40,9 @@ Framing::Framing(const char* delimiter, size_t maxFrameLength) {
 
   _deframe = new Deframer(delimiter, maxFrameLength);
 }
+
+Framing::~Framing(){
+  delete _deframe;
+}
 Flow<Bytes, Bytes>& Framing::deframe() { return *_deframe; }
 Flow<Bytes, Bytes>& Framing::frame() { return _frame; }

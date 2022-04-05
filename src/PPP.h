@@ -24,6 +24,7 @@ class PPP {
 
  public:
   PPP(size_t);
+  ~PPP();
 
   void addEscaped(Bytes &out, uint8_t c);
   bool handleFrame(const Bytes &bs);

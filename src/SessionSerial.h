@@ -7,10 +7,7 @@
 
 // typedef enum { CMD_OPEN, CMD_CLOSE } TcpCommand;
 
-class SerialSessionError;
-
 class SessionSerial : public Actor, public Invoker {
-  SerialSessionError *_errorInvoker;
   int _serialfd;
   Serial _serialPort;
   string _port;
@@ -29,21 +26,15 @@ class SessionSerial : public Actor, public Invoker {
   bool init();
   bool connect();
   bool disconnect();
+  void reconnect();
   void onError();
+  void onRead();
   int fd();
-  void invoke();
+
   Source<Bytes> &incoming();
   Sink<Bytes> &outgoing();
   Source<bool> &connected();
   string port();
 };
 
-class SerialSessionError : public Invoker {
-  SessionSerial &_serialSession;
-
- public:
-  SerialSessionError(SessionSerial &serialSession)
-      : _serialSession(serialSession){};
-  void invoke() { _serialSession.onError(); }
-};
 #endif

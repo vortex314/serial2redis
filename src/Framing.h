@@ -9,6 +9,7 @@ class Framing {
 
  public:
   Framing(const char* delimiter, size_t maxFrameLength);
+  ~Framing();
   Flow<Bytes, Bytes>& deframe();
   Flow<Bytes, Bytes>& frame();
 };
