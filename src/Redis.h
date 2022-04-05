@@ -10,13 +10,13 @@ class Redis : public Actor {
   QueueFlow<Json> _request;
   QueueFlow<Json> _response;
   redisAsyncContext *_ac;
-  bool _connected;
+  ValiueFlow<bool> _connected;
   std::string _redisHost;
   uint16_t _redisPort;
   Json _docIn;
   bool _reconnectOnConnectionLoss;
   bool _addReplyContext;
-  SinkFunction<Json>* _jsonToRedis;
+  SinkFunction<Json> *_jsonToRedis;
 
  public:
   Redis(Thread &thread, JsonObject config);
@@ -24,13 +24,14 @@ class Redis : public Actor {
 
   static void onPush(redisAsyncContext *ac, void *reply);
   static void replyHandler(redisAsyncContext *ac, void *reply, void *me);
-  static void free_privdata(void *pvdata) ;
+  static void free_privdata(void *pvdata);
 
   int connect();
   void disconnect();
 
   Sink<Json> &request();
   Source<Json> &response();
+  Source<bool> &connected();
 
   static void addWriteFd(void *pv);
   static void addReadFd(void *pv);

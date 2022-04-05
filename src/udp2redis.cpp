@@ -82,13 +82,9 @@ bool loadConfig(JsonObject cfg, int argc, char **argv) {
 
 class ClientProxy : public Actor {
   UdpAddress _sourceAddress;
-  QueueFlow<std::string> _incoming;
-  QueueFlow<std::string> _outgoing;
-  String nodeName;
-  std::string _node;
+  QueueFlow<std::string> _incoming;  // recv UDP
+  ValueFlow<std::string> _outgoing;  // send UDP
   bool _connected;
-  std::string _redisHost;
-  uint16_t _redisPort;
   DynamicJsonDocument _docIn;
   Redis _redis;
   uint64_t _lastMessage;
@@ -100,7 +96,6 @@ class ClientProxy : public Actor {
       : Actor(thread),
         _sourceAddress(source),
         _incoming(10, "incoming"),
-        _outgoing(5, "outgoing"),
         _docIn(10240),
         _redis(thread, config) {
     INFO(" created clientProxy %s ", _sourceAddress.toString().c_str());
@@ -123,7 +118,6 @@ class ClientProxy : public Actor {
         });
 
     _incoming.async(thread);
-    _outgoing.async(thread);
 
     _redis.response() >> _jsonToString >> _outgoing;
     _incoming >> _stringToJson >> _redis.request();
@@ -191,8 +185,9 @@ int main(int argc, char **argv) {
                  .c_str());
         udpSession.send().on(msg);
       };
-      clients.insert(
+      auto res = clients.insert(
           std::pair<UdpAddress, ClientProxy *>(udpSource, clientProxy));
+      assert(res.second);
       clientProxy->connect();
     } else {
       clientProxy = it->second;
@@ -212,7 +207,7 @@ int main(int argc, char **argv) {
         ClientProxy *proxy = itr->second;
         itr = clients.erase(itr);
         proxy->disconnect();
-        delete proxy;
+        delete proxy; // disconnect is  async , can we delete ? 
         INFO("cleanup done");
       } else {
         ++itr;

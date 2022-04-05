@@ -9,14 +9,14 @@ struct RedisReplyContext {
 void Redis::addWriteFd(void *pv) {
   Redis *redis = (Redis *)pv;
   redis->thread().addWriteInvoker(
-      redis->_ac->c.fd, [redis](int) { 
+      redis->_ac->c.fd, [=](int) { 
         redisAsyncHandleWrite(redis->_ac); });
 }
 
 void Redis::addReadFd(void *pv) {
   Redis *redis = (Redis *)pv;
   redis->thread().addReadInvoker(
-      redis->_ac->c.fd, [redis](int) { 
+      redis->_ac->c.fd, [=](int) { 
         redisAsyncHandleRead(redis->_ac); });
 }
 
@@ -50,11 +50,11 @@ Redis::Redis(Thread &thread, JsonObject config)
   _ac = 0;
 
   _jsonToRedis = new SinkFunction<Json>([&](const Json &docIn) {
-    if (!_connected) return;
+    if (!_connected()) return;
     std::string s;
     serializeJson(docIn, s);
     INFO("Redis:request  %s ", s.c_str());
-    if (!_connected || !docIn.is<JsonArray>()) return;
+    if ( !docIn.is<JsonArray>()) return;
     Json *js = (Json *)&docIn;
     JsonArray array = js->as<JsonArray>();
     const char *argv[100];
@@ -74,7 +74,7 @@ Redis::Redis(Thread &thread, JsonObject config)
 Redis::~Redis() {
   INFO("~Redis()");
   _reconnectOnConnectionLoss = false;
-  if (_connected) disconnect();
+  if (_connected()) disconnect();
   cleanupFd(this);
   delete _jsonToRedis;
 }
@@ -97,7 +97,7 @@ int Redis::connect() {
   _ac = redisAsyncConnectWithOptions(&options);
 
   if (_ac == NULL || _ac->err) {
-    INFO(" Connection %s:%d failed", _redisHost.c_str(), _redisPort);
+    WARN(" Connection %s:%d failed", _redisHost.c_str(), _redisPort);
     return ENOTCONN;
   }
 
