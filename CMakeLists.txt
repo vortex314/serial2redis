@@ -33,7 +33,6 @@ target_sources(serial2redis PRIVATE
     ${LIMERO}/linux/Sys.cpp
     ${LIMERO}/linux/limero.cpp
     ${LIMERO}/src/printf.c
-    src/Crc32.cpp
     src/Common.cpp
     ${LIMERO}/src/StringUtility.cpp
     ) 

@@ -7,7 +7,7 @@
 
 // typedef enum { CMD_OPEN, CMD_CLOSE } TcpCommand;
 
-class SessionSerial : public Actor, public Invoker {
+class SessionSerial : public Actor {
   int _serialfd;
   Serial _serialPort;
   string _port;

@@ -8,16 +8,16 @@ struct RedisReplyContext {
 
 void Redis::addWriteFd(void *pv) {
   Redis *redis = (Redis *)pv;
-  redis->thread().addWriteInvoker(
-      redis->_ac->c.fd, [=](int) { 
-        redisAsyncHandleWrite(redis->_ac); });
+  redis->thread().addWriteInvoker(redis->_ac->c.fd, redis, [](void *pv) {
+    redisAsyncHandleWrite(((Redis *)pv)->_ac);
+  });
 }
 
 void Redis::addReadFd(void *pv) {
   Redis *redis = (Redis *)pv;
-  redis->thread().addReadInvoker(
-      redis->_ac->c.fd, [=](int) { 
-        redisAsyncHandleRead(redis->_ac); });
+  redis->thread().addReadInvoker(redis->_ac->c.fd, redis, [](void *pv) {
+    redisAsyncHandleRead(((Redis *)pv)->_ac);
+  });
 }
 
 void Redis::delWriteFd(void *pv) {
@@ -40,7 +40,7 @@ void Redis::cleanupFd(void *pv) {
 }
 
 Redis::Redis(Thread &thread, JsonObject config)
-    : Actor(thread), _request(10, "request"), _response(5, "response") {
+    : Actor(thread), _request(10, "request") {
   _request.async(thread);
   _response.async(thread);
   _redisHost = config["host"] | "localhost";
@@ -54,7 +54,7 @@ Redis::Redis(Thread &thread, JsonObject config)
     std::string s;
     serializeJson(docIn, s);
     INFO("Redis:request  %s ", s.c_str());
-    if ( !docIn.is<JsonArray>()) return;
+    if (!docIn.is<JsonArray>()) return;
     Json *js = (Json *)&docIn;
     JsonArray array = js->as<JsonArray>();
     const char *argv[100];
@@ -168,7 +168,7 @@ void Redis::replyHandler(redisAsyncContext *ac, void *repl, void *pv) {
 
   std::string str;
   serializeJson(doc, str);
-  INFO(" reply on %s : %s ", redisReplyContext->command.c_str(), str.c_str());
+  INFO("Redis:reply '%s' =>  %s ", redisReplyContext->command.c_str(), str.c_str());
   delete redisReplyContext;
 }
 

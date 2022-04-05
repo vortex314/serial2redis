@@ -21,8 +21,10 @@ bool SessionSerial::init() {
 
 bool SessionSerial::connect() {
   if (_serialPort.connect() != 0) return false;
-  thread().addReadInvoker(_serialPort.fd(), [&](int) { onRead(); });
-  thread().addErrorInvoker(_serialPort.fd(), [&](int) { onError(); });
+  thread().addReadInvoker(_serialPort.fd(), this,
+                          [](void *pv) { ((SessionSerial *)pv)->onRead(); });
+  thread().addErrorInvoker(_serialPort.fd(), this,
+                           [](void *pv) { ((SessionSerial *)pv)->onError(); });
   return true;
 }
 

@@ -22,8 +22,10 @@ bool SessionUdp::init() {
 }
 
 bool SessionUdp::connect() {
-  thread().addReadInvoker(_udp.fd(), [&](int) { invoke(); });
-  thread().addErrorInvoker(_udp.fd(), [&](int) { onError(); });
+  thread().addReadInvoker(_udp.fd(), this,
+                          [](void *pv) { ((SessionUdp *)pv)->invoke(); });
+  thread().addErrorInvoker(_udp.fd(), this,
+                           [](void *pv) { ((SessionUdp *)pv)->onError(); });
   return true;
 }
 
@@ -37,7 +39,7 @@ void SessionUdp::invoke() {
   int rc = _udp.receive(_udpMsg);
   if (rc == 0) {  // read ok
     DEBUG("UDP RXD %s => %s ", _udpMsg.src.toString().c_str(),
-         hexDump(_udpMsg.message).c_str());
+          hexDump(_udpMsg.message).c_str());
     _recv.on(_udpMsg);
   }
 }
