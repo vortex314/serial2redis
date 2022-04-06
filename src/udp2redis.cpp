@@ -115,12 +115,13 @@ class RedisProxy : public Actor {
   };
 
   ~RedisProxy() {
+    INFO("dtor RedisProxy")
     delete _stringToJson;
     delete _jsonToString;
   }
 
   int connect() { return _redis.connect(); }
-
+  void stop() { _redis.stop(); }
   void disconnect() { _redis.disconnect(); }
 
   Sink<std::string> &toRedis() { return _toRedis; }
@@ -184,7 +185,7 @@ int main(int argc, char **argv) {
         INFO(" Delete client %s after %d timeout.",
              clientAddress.toString().c_str(),proxyTimeout);
         itr = clients.erase(itr);
-        proxy->disconnect();
+        proxy->stop();
         delete proxy;  // disconnect is  async , can we delete ?
       } else {
         ++itr;

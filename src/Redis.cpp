@@ -4,6 +4,11 @@
 struct RedisReplyContext {
   std::string command;
   Redis *me;
+  RedisReplyContext( const std::string &command,Redis *me)
+      : command(command), me(me) {
+    INFO("new RedisReplyContext %X", this);
+  }
+  ~RedisReplyContext() { INFO("delete RedisReplyContext %X", this); }
 };
 
 void Redis::addWriteFd(void *pv) {
@@ -40,7 +45,7 @@ void Redis::cleanupFd(void *pv) {
 }
 
 Redis::Redis(Thread &thread, JsonObject config)
-    : Actor(thread), _request(10, "request") {
+    : Actor(thread), _request(10, "request"), _response(100, "response") {
   _request.async(thread);
   _response.async(thread);
   _redisHost = config["host"] | "localhost";
@@ -50,7 +55,7 @@ Redis::Redis(Thread &thread, JsonObject config)
   _ac = 0;
 
   _jsonToRedis = new SinkFunction<Json>([&](const Json &docIn) {
-    if (!_connected()) return;
+    //    if (!_connected()) return; // otherwise first message lost
     std::string s;
     serializeJson(docIn, s);
     INFO("Redis:request  %s ", s.c_str());
@@ -64,9 +69,10 @@ Redis::Redis(Thread &thread, JsonObject config)
       argv[i] = array[i].as<const char *>();
     }
     argc = array.size();
-    redisAsyncCommandArgv(_ac, replyHandler,
-                          new RedisReplyContext{argv[0], this}, argc, argv,
-                          NULL);
+    int rc = redisAsyncCommandArgv(_ac, replyHandler,
+                                   new RedisReplyContext(argv[0], this), argc,
+                                   argv, NULL);
+    if (rc) WARN("redisAsyncCommandArgv() failed")
   });
   _request >> _jsonToRedis;
 };
@@ -133,6 +139,11 @@ int Redis::connect() {
   return 0;
 }
 
+void Redis::stop() {
+  _reconnectOnConnectionLoss = false;
+  disconnect();
+}
+
 void Redis::disconnect() {
   INFO(" disconnect called");
   redisAsyncDisconnect(_ac);
@@ -151,7 +162,7 @@ void Redis::replyHandler(redisAsyncContext *ac, void *repl, void *pv) {
     replyToJson(doc.as<JsonVariant>(), reply);
     std::string str;
     serializeJson(doc, str);
-    INFO(" push %s ", str.c_str());
+    INFO("Redis:push %s", str.c_str());
     redis->_response.on(doc);
     return;
   }
@@ -169,8 +180,8 @@ void Redis::replyHandler(redisAsyncContext *ac, void *repl, void *pv) {
 
   std::string str;
   serializeJson(doc, str);
-  INFO("Redis:reply '%s' =>  %s ", redisReplyContext->command.c_str(),
-       str.c_str());
+  INFO("Redis:reply %X '%s' =>  %s ", redisReplyContext,
+       redisReplyContext->command.c_str(), str.c_str());
   delete redisReplyContext;
 }
 
