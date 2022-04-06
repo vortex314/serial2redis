@@ -1,24 +1,16 @@
 #include <SessionUdp.h>
 #include <StringUtility.h>
 
-SessionUdp::SessionUdp(Thread &thread, JsonObject config)
-    : Actor(thread),
-      _incomingMessage(10, "_incomingMessage"),
-      _outgoingMessage(10, "_outgoingMessage"),
-      _send(10, "send"),
-      _recv(10, "recv") {
-  _recv.async(thread);
-  _send.async(thread);
+SessionUdp::SessionUdp(Thread &thread, UdpAddress address)
+    : Actor(thread),_udp(address),_connected(false) {
+    {
   _errorInvoker = new UdpSessionError(*this);
-  _port = config["port"].as<uint32_t>();
+  _udp.address(address);
   _send >> [&](const UdpMsg &um) { _udp.send(um); };
 }
 
-bool SessionUdp::init() {
-  _udp.port(_port);
-  _udp.init();
-
-  return true;
+UdpAddress SessionUdp::address() {
+  return _udp.address();
 }
 
 bool SessionUdp::connect() {
@@ -51,10 +43,8 @@ void SessionUdp::onError() {
 
 int SessionUdp::fd() { return _udp.fd(); }
 
-Source<Bytes> &SessionUdp::incoming() { return _incomingMessage; }
 Source<UdpMsg> &SessionUdp::recv() { return _recv; }
 
-Sink<Bytes> &SessionUdp::outgoing() { return _outgoingMessage; }
 Sink<UdpMsg> &SessionUdp::send() { return _send; }
 
 Source<bool> &SessionUdp::connected() { return _connected; }

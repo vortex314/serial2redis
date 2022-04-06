@@ -13,23 +13,21 @@ class SessionUdp : public Actor {
   UdpSessionError *_errorInvoker;
   int _serialfd;
   Udp _udp;
-  int _port;
   std::string _interface;
   uint64_t _frameTimeout = 2000;
-  QueueFlow<Bytes> _incomingMessage;
-  QueueFlow<Bytes> _outgoingMessage;
+  ValueFlow<Bytes> _incomingMessage;
+  ValueFlow<Bytes> _outgoingMessage;
   ValueFlow<String> _logs;
 
-  QueueFlow<UdpMsg> _recv;
-  QueueFlow<UdpMsg> _send;
+  ValueFlow<UdpMsg> _recv;
+  ValueFlow<UdpMsg> _send;
 
   ValueFlow<bool> _connected;
   UdpMsg _udpMsg;
 
  public:
   //  ValueSource<TcpCommand> command;
-  SessionUdp(Thread &thread, JsonObject config);
-  bool init();
+  SessionUdp(Thread &thread, UdpAddress address);
   bool connect();
   bool disconnect();
   void onError();
@@ -41,6 +39,7 @@ class SessionUdp : public Actor {
   Source<String> &logs();
   Source<UdpMsg> &recv();
   Sink<UdpMsg> &send();
+  UdpAddress address();
 };
 
 class UdpSessionError : public Invoker {

@@ -3,6 +3,8 @@
 #include <Log.h>
 #include <StringUtility.h>
 
+Udp::Udp(UdpAddress addr) : _addr(addr) {}
+
 int Udp::init() {
   struct sockaddr_in servaddr;
   if ((_sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
@@ -15,13 +17,13 @@ int Udp::init() {
              sizeof(int));
   memset(&servaddr, 0, sizeof(servaddr));
   servaddr.sin_family = AF_INET;  // IPv4
-  servaddr.sin_addr.s_addr = INADDR_ANY;
-  servaddr.sin_port = htons(_myPort);
+  servaddr.sin_addr.s_addr = _addr.ip;
+  servaddr.sin_port = htons(_addr.port);
   if (bind(_sockfd, (const struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
     WARN("bind failed %d : %s", errno, strerror(errno));
     return (errno);
   }
-  INFO("UDP listening port:%d socket:%d", _myPort, _sockfd);
+  INFO("UDP listening port:%d socket:%d", _port, _sockfd);
   return 0;
 }
 
@@ -37,8 +39,8 @@ int Udp::receive(UdpMsg &rxd) {
 
   socklen_t len = sizeof(clientaddr);  // len is value/resuslt
   clientaddr.sin_family = AF_INET;
-  clientaddr.sin_port = htons(_myPort);
-  clientaddr.sin_addr.s_addr = INADDR_ANY;
+  clientaddr.sin_port = htons(_addr.port);
+  clientaddr.sin_addr.s_addr = _addr.ip;
 
   int rc = recvfrom(_sockfd, (char *)buffer, sizeof(buffer), MSG_WAITALL,
                     (struct sockaddr *)&clientaddr, &len);
@@ -47,8 +49,7 @@ int Udp::receive(UdpMsg &rxd) {
     rxd.message.clear();
     rxd.src.ip = clientaddr.sin_addr.s_addr;
     rxd.src.port = ntohs(clientaddr.sin_port);
-    rxd.dst.ip = INADDR_ANY;
-    rxd.dst.port = _myPort;
+    rxd.dst = _addr;
   /*  INFO(" received from %s to %s  ", rxd.src.toString().c_str(),
          rxd.dst.toString().c_str());*/
     rxd.message = Bytes(buffer, buffer + rc);
@@ -62,16 +63,16 @@ int Udp::receive(UdpMsg &rxd) {
 
 // Driver code
 int Udp::send(const UdpMsg &udpMsg) {
-  struct sockaddr_in server;
-  server.sin_family = AF_INET;
-  server.sin_port = htons(udpMsg.dst.port);
-  server.sin_addr.s_addr = udpMsg.dst.ip;
+  struct sockaddr_in dest;
+  dest.sin_family = AF_INET;
+  dest.sin_port = htons(udpMsg.dst.port);
+  dest.sin_addr.s_addr = udpMsg.dst.ip;
 
   /* INFO("TXD UDP => %s : %s ", udpMsg.dst.toString().c_str(),
         hexDump(udpMsg.message).c_str());*/
 
   int rc = sendto(_sockfd, udpMsg.message.data(), udpMsg.message.size(), 0,
-                  (const struct sockaddr *)&server, sizeof(server));
+                  (const struct sockaddr *)&dest, sizeof(dest));
   if (rc < 0) return errno;
   return 0;
 }
@@ -125,6 +126,11 @@ bool getNetPort(uint16_t &x, const std::string &s) {
 //  INFO("getNetPort(%s)=%d",s.c_str(),x);
 //  x = htons(x);
   return true;
+}
+
+UdpAddress::UdpAddress(std::string _ip,uint16_t _port) {
+  port = _port;
+  getInetAddr(ip,_ip);
 }
 
 bool UdpAddress::fromUri(UdpAddress &udpAddress, std::string uri) {
