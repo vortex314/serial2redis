@@ -92,7 +92,7 @@ class RedisProxy : public Actor {
 
  public:
   RedisProxy(Thread &thread, JsonObject config)
-      : Actor(thread), _toRedis(10, "toRedis"), _redis(thread, config) {
+      : Actor(thread),  _redis(thread, config) {
     _stringToJson = new LambdaFlow<std::string, Json>(
         [&](Json &docIn, const std::string &s) {
           if (s.c_str() == nullptr) return false;
@@ -144,8 +144,6 @@ int main(int argc, char **argv) {
   SessionUdp udpServer(workerThread, serverAddress);
   udpServer.connect();
 
-  INFO("%s", serverAddress.toString().c_str());
-
   udpServer.recv() >> [&](const UdpMsg &udpMsg) {
     std::string payload =
         std::string(udpMsg.message.begin(), udpMsg.message.end());
@@ -158,8 +156,8 @@ int main(int argc, char **argv) {
     auto it = clients.find(udpSource);
     if (it == clients.end()) {
       redisProxy = new RedisProxy(workerThread, brokerConfig);
-      redisProxy->fromRedis() >> [=](const std::string &bs) {
-        UdpMsg msg(serverAddress,udpSource,std::vector<uint8_t>(bs.data(), bs.data() + bs.size());
+      redisProxy->fromRedis() >> [&,udpSource](const std::string &bs) {
+        UdpMsg msg {serverAddress,udpSource,std::vector<uint8_t>(bs.data(), bs.data() + bs.size())};
         INFO("UDP TXD %s => %s : %s ", msg.src.toString().c_str(),
              msg.dst.toString().c_str(), bs.c_str());
         udpServer.send().on(msg);
@@ -182,7 +180,7 @@ int main(int argc, char **argv) {
     while (itr != clients.end()) {
       RedisProxy *proxy = itr->second;
       UdpAddress clientAddress = itr->first;
-      if (proxy->inactivity() >  proxyTimeout)) {
+      if (proxy->inactivity() >  proxyTimeout) {
         INFO(" Delete client %s after %d timeout.",
              clientAddress.toString().c_str(),proxyTimeout);
         itr = clients.erase(itr);

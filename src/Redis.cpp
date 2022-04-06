@@ -142,7 +142,7 @@ void Redis::replyHandler(redisAsyncContext *ac, void *repl, void *pv) {
   redisReply *reply = (redisReply *)repl;
   Json doc;
   if (reply == 0) {
-    WARN(" replyHandler caught null ");
+    WARN(" replyHandler caught null %d : %s ", ac->err, ac->errstr);
     return;  // disconnect ?
   };
   if (reply->type == REDIS_REPLY_PUSH &&
@@ -165,10 +165,12 @@ void Redis::replyHandler(redisAsyncContext *ac, void *repl, void *pv) {
   } else {
     replyToJson(doc.as<JsonVariant>(), reply);
   }
+  redis->_response.on(doc);
 
   std::string str;
   serializeJson(doc, str);
-  INFO("Redis:reply '%s' =>  %s ", redisReplyContext->command.c_str(), str.c_str());
+  INFO("Redis:reply '%s' =>  %s ", redisReplyContext->command.c_str(),
+       str.c_str());
   delete redisReplyContext;
 }
 

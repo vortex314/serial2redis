@@ -41,6 +41,7 @@ struct UdpAddress {
   bool operator==(UdpAddress &other) {
     return memcmp(&other.ip, &ip, sizeof ip) == 0 && other.port == port;
   }
+  UdpAddress() {};
   UdpAddress(std::string ip, uint16_t port);
   static bool fromUri(UdpAddress &, std::string);
   /* bool operator()(const UdpAddress &lhs, const UdpAddress &rhs) const {
@@ -78,7 +79,7 @@ class Udp {
   Udp(UdpAddress addr);
   void dst(const char *);
   void address(UdpAddress addr) { _addr = addr; };
-  UdpAddress address() { return _addr; } ;
+  UdpAddress address() { return _addr; };
   int init();
   int receive(UdpMsg &);
   int send(const UdpMsg &);

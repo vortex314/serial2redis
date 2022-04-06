@@ -23,7 +23,7 @@ int Udp::init() {
     WARN("bind failed %d : %s", errno, strerror(errno));
     return (errno);
   }
-  INFO("UDP listening port:%d socket:%d", _port, _sockfd);
+  INFO("UDP listening %s socket:%d", _addr.toString().c_str(), _sockfd);
   return 0;
 }
 

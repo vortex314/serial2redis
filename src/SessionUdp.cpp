@@ -2,18 +2,16 @@
 #include <StringUtility.h>
 
 SessionUdp::SessionUdp(Thread &thread, UdpAddress address)
-    : Actor(thread),_udp(address),_connected(false) {
-    {
+    : Actor(thread), _udp(address), _connected(false) {
   _errorInvoker = new UdpSessionError(*this);
   _udp.address(address);
   _send >> [&](const UdpMsg &um) { _udp.send(um); };
 }
 
-UdpAddress SessionUdp::address() {
-  return _udp.address();
-}
+UdpAddress SessionUdp::address() { return _udp.address(); }
 
 bool SessionUdp::connect() {
+  if( _udp.init() ) return false;
   thread().addReadInvoker(_udp.fd(), this,
                           [](void *pv) { ((SessionUdp *)pv)->invoke(); });
   thread().addErrorInvoker(_udp.fd(), this,
