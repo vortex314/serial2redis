@@ -72,7 +72,7 @@ Redis::Redis(Thread &thread, JsonObject config)
     int rc = redisAsyncCommandArgv(_ac, replyHandler,
                                    new RedisReplyContext(argv[0], this), argc,
                                    argv, NULL);
-    if (rc) WARN("redisAsyncCommandArgv() failed")
+    if (rc) WARN("redisAsyncCommandArgv() failed %d : %s ",_ac->err,_ac->errstr);
   });
   _request >> _jsonToRedis;
 };

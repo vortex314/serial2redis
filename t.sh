@@ -1,5 +1,6 @@
 while true
 do
+	sleep 0.1
 	echo -n '["hello","3"]'
 	RANDOM=`od -An -N2 -i /dev/random`
 	echo -n '["TS.ADD", "randomArduino", "*", "'$RANDOM'","LABELS","property","random"]'
