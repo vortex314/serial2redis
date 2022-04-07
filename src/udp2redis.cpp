@@ -40,7 +40,7 @@ bool loadConfig(JsonObject cfg, int argc, char **argv) {
 
   // override args
   int c;
-  while ((c = getopt(argc, argv, "h:p:n:u:t:f:")) != -1) {
+  while ((c = getopt(argc, argv, "h:p:n:u:t:f:v")) != -1) {
     switch (c) {
       case 'u':
         cfg["udp"]["port"] = atoi(optarg);
@@ -64,6 +64,10 @@ bool loadConfig(JsonObject cfg, int argc, char **argv) {
       case 'p':
         cfg["broker"]["port"] = atoi(optarg);
         break;
+      case 'v': {
+        logger.setLevel(Log::L_DEBUG);
+        break;
+      }
       case '?':
         printf("Usage %s -h <host> -p <port> -s <serial_port> -b <baudrate>\n",
                argv[0]);
@@ -92,7 +96,7 @@ class RedisProxy : public Actor {
 
  public:
   RedisProxy(Thread &thread, JsonObject config)
-      : Actor(thread),  _redis(thread, config) {
+      : Actor(thread), _redis(thread, config) {
     _stringToJson = new LambdaFlow<std::string, Json>(
         [&](Json &docIn, const std::string &s) {
           if (s.c_str() == nullptr) return false;
@@ -126,7 +130,7 @@ class RedisProxy : public Actor {
 
   Sink<std::string> &toRedis() { return _toRedis; }
   Source<std::string> &fromRedis() { return _fromRedis; }
-  uint64_t inactivity() { return Sys::millis()- _lastMessage; }
+  uint64_t inactivity() { return Sys::millis() - _lastMessage; }
 };
 
 //==========================================================================
@@ -148,7 +152,7 @@ int main(int argc, char **argv) {
   udpServer.recv() >> [&](const UdpMsg &udpMsg) {
     std::string payload =
         std::string(udpMsg.message.begin(), udpMsg.message.end());
-    INFO("UDP RXD %s => %s : %s", udpMsg.src.toString().c_str(),
+    DEBUG("UDP RXD %s => %s : %s", udpMsg.src.toString().c_str(),
          udpMsg.dst.toString().c_str(), payload.c_str());
 
     UdpAddress udpSource = udpMsg.src;
@@ -157,9 +161,10 @@ int main(int argc, char **argv) {
     auto it = clients.find(udpSource);
     if (it == clients.end()) {
       redisProxy = new RedisProxy(workerThread, brokerConfig);
-      redisProxy->fromRedis() >> [&,udpSource](const std::string &bs) {
-        UdpMsg msg {serverAddress,udpSource,std::vector<uint8_t>(bs.data(), bs.data() + bs.size())};
-        INFO("UDP TXD %s => %s : %s ", msg.src.toString().c_str(),
+      redisProxy->fromRedis() >> [&, udpSource](const std::string &bs) {
+        UdpMsg msg{serverAddress, udpSource,
+                   std::vector<uint8_t>(bs.data(), bs.data() + bs.size())};
+        DEBUG("UDP TXD %s => %s : %s ", msg.src.toString().c_str(),
              msg.dst.toString().c_str(), bs.c_str());
         udpServer.send().on(msg);
       };
@@ -181,9 +186,9 @@ int main(int argc, char **argv) {
     while (itr != clients.end()) {
       RedisProxy *proxy = itr->second;
       UdpAddress clientAddress = itr->first;
-      if (proxy->inactivity() >  proxyTimeout) {
+      if (proxy->inactivity() > proxyTimeout) {
         INFO(" Delete client %s after %d timeout.",
-             clientAddress.toString().c_str(),proxyTimeout);
+             clientAddress.toString().c_str(), proxyTimeout);
         itr = clients.erase(itr);
         proxy->stop();
         delete proxy;  // disconnect is  async , can we delete ?

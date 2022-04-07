@@ -133,13 +133,6 @@ UdpAddress::UdpAddress(std::string _ip,uint16_t _port) {
   getInetAddr(ip,_ip);
 }
 
-bool UdpAddress::fromUri(UdpAddress &udpAddress, std::string uri) {
-  auto parts = split(uri, ':');
-
-  return parts.size() == 2 && getInetAddr(udpAddress.ip, parts[0]) &&
-         getNetPort(udpAddress.port, parts[1]);
-}
-
 std::string UdpAddress::toString() const {
   char charBuffer[100];
   const char *ipString =

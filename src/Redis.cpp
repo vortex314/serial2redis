@@ -6,9 +6,9 @@ struct RedisReplyContext {
   Redis *me;
   RedisReplyContext( const std::string &command,Redis *me)
       : command(command), me(me) {
-    INFO("new RedisReplyContext %X", this);
+    DEBUG("new RedisReplyContext %X", this);
   }
-  ~RedisReplyContext() { INFO("delete RedisReplyContext %X", this); }
+  ~RedisReplyContext() { DEBUG("delete RedisReplyContext %X", this); }
 };
 
 void Redis::addWriteFd(void *pv) {
@@ -58,7 +58,7 @@ Redis::Redis(Thread &thread, JsonObject config)
     //    if (!_connected()) return; // otherwise first message lost
     std::string s;
     serializeJson(docIn, s);
-    INFO("Redis:request  %s ", s.c_str());
+    DEBUG("Redis:request  %s ", s.c_str());
     if (!docIn.is<JsonArray>()) return;
     Json *js = (Json *)&docIn;
     JsonArray array = js->as<JsonArray>();
@@ -162,7 +162,7 @@ void Redis::replyHandler(redisAsyncContext *ac, void *repl, void *pv) {
     replyToJson(doc.as<JsonVariant>(), reply);
     std::string str;
     serializeJson(doc, str);
-    INFO("Redis:push %s", str.c_str());
+    DEBUG("Redis:push %s", str.c_str());
     redis->_response.on(doc);
     return;
   }
@@ -180,7 +180,7 @@ void Redis::replyHandler(redisAsyncContext *ac, void *repl, void *pv) {
 
   std::string str;
   serializeJson(doc, str);
-  INFO("Redis:reply %X '%s' =>  %s ", redisReplyContext,
+  DEBUG("Redis:reply %X '%s' =>  %s ", redisReplyContext,
        redisReplyContext->command.c_str(), str.c_str());
   delete redisReplyContext;
 }

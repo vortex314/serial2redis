@@ -68,4 +68,4 @@ Sink<Bytes> &SessionSerial::outgoing() { return _outgoingFrame; }
 
 Source<bool> &SessionSerial::connected() { return _connected; }
 
-string SessionSerial::port() { return _port; }
+std::string SessionSerial::port() { return _port; }

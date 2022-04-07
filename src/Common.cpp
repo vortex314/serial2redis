@@ -85,12 +85,3 @@ bool validate(JsonVariant js, std::string format) {
   return false;
 }
 
-int token(JsonVariant v) {
-  if (v.is<std::string>()) {
-    std::string s = v;
-    return H(s.c_str());
-  } else if (v.is<int>()) {
-    return v.as<int>();
-  }
-  return -1;
-}

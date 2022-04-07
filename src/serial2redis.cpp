@@ -29,7 +29,7 @@ void loadConfig(JsonDocument &cfg, int argc, char **argv) {
   cfg["proxy"]["timeout"] = 5000;
   // override args
   int c;
-  while ((c = getopt(argc, argv, "h:p:s:b:f:t:")) != -1) switch (c) {
+  while ((c = getopt(argc, argv, "h:p:s:b:f:t:v")) != -1) switch (c) {
       case 'b':
         cfg["serial"]["baudrate"] = atoi(optarg);
         break;
@@ -48,6 +48,10 @@ void loadConfig(JsonDocument &cfg, int argc, char **argv) {
       case 't':
         cfg["proxy"]["timeout"] = atoi(optarg);
         break;
+      case 'v': {
+        logger.setLevel(Log::L_DEBUG);
+        break;
+      }
       case '?':
         printf("Usage %s -h <host> -p <port> -s <serial_port> -b <baudrate>\n",
                argv[0]);
@@ -90,7 +94,7 @@ int main(int argc, char **argv) {
         if (rc != DeserializationError::Ok) {
           INFO("RXD : %s%s%s", ColorOrange, s.c_str(), ColorDefault);
         } else {
-          //          INFO("RXD : '%s'", s.c_str());
+          DEBUG("RXD : '%s'", s.c_str());
         }
         return rc == DeserializationError::Ok;
       });
@@ -99,7 +103,7 @@ int main(int argc, char **argv) {
       new LambdaFlow<Json, Bytes>([&](Bytes &msg, const Json &docIn) {
         std::string str;
         size_t sz = serializeJson(docIn, str);
-                INFO("TXD : '%s'", str.c_str());
+        DEBUG("TXD : '%s'", str.c_str());
         msg = Bytes(str.begin(), str.end());
         return str.size() > 0;
       });
@@ -115,7 +119,7 @@ int main(int argc, char **argv) {
     redis.response() >> jsonToBytes >> ppp.frame() >> serial.outgoing();
 
   } else {
-    WARN("unknown framing : %s ",framing.c_str());
+    WARN("unknown framing : %s ", framing.c_str());
     exit(-1);
   }
 

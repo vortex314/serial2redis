@@ -10,7 +10,7 @@
 class SessionSerial : public Actor {
   int _serialfd;
   Serial _serialPort;
-  string _port;
+  std::string _port;
   uint32_t _baudrate;
   Bytes _rxdBuffer;
   Bytes _inputFrame;
@@ -34,7 +34,7 @@ class SessionSerial : public Actor {
   Source<Bytes> &incoming();
   Sink<Bytes> &outgoing();
   Source<bool> &connected();
-  string port();
+  std::string port();
 };
 
 #endif
