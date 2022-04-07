@@ -5,7 +5,6 @@
 #include <Sys.h>
 
 #include <thread>
-using namespace std;
 
 typedef struct {
   uint32_t baudrate;
@@ -49,19 +48,19 @@ int baudToValue(int symbol) {
   return 0;
 }
 //=====================================================================================
-int Serial::port(string port) {
+int Serial::port(std::string port) {
   _port = port;
   return 0;
 }
 
-const string &Serial::port() { return _port; }
+const std::string &Serial::port() { return _port; }
 
-const string Serial::shortName() const {
+const std::string Serial::shortName() const {
   if (_port.find("/dev/tty") == 0) {
     return _port.substr(8);
   } else {
     size_t pos = _port.rfind('/');
-    if (pos == string::npos) {
+    if (pos == std::string::npos) {
       return _port;
     } else {
       return _port.substr(pos + 1);
@@ -128,9 +127,6 @@ int Serial::connect() {
     return errno;
   }
   _connected = true;
-
-  modeInfo();
-  //  modeRun();
   return 0;
 }
 //=====================================================================================
@@ -147,7 +143,7 @@ int Serial::disconnect() {
   return 0;
 }
 //=====================================================================================
-int Serial::rxd(bytes &out) {
+int Serial::rxd(Bytes &out) {
   out.clear();
   if (!_connected) return ENOTCONN;
   char buffer[1024];
@@ -167,7 +163,7 @@ int Serial::rxd(bytes &out) {
   }
 }
 //=====================================================================================
-int Serial::txd(const bytes &buffer) {
+int Serial::txd(const Bytes &buffer) {
   if (!_connected) return ENOTCONN;
 
   const uint8_t *buf;
@@ -206,60 +202,3 @@ int Serial::baudrate(uint32_t br) {
 
 uint32_t Serial::baudrate() { return baudToValue(_baudrate); }
 int Serial::fd() { return _fd; }
-
-//=====================================================================================
-int Serial::modeInfo() {
-  int mode;
-
-  int rc = ioctl(_fd, TIOCMGET, &mode);
-  if (rc) WARN("ioctl()= %s (%d)", strerror(errno), errno);
-  string sMode;
-  if (mode & TIOCM_CAR) sMode += "TIOCM_CAR,";
-  if (mode & TIOCM_CD) sMode += "TIOCM_CD,";
-  if (mode & TIOCM_DTR) sMode += "TIOCM_DTR,";
-  if (mode & TIOCM_RTS) sMode += "TIOCM_RTS,";
-  if (mode & TIOCM_DSR) sMode += "TIOCM_DSR,";
-  INFO(" line mode : %s", sMode.c_str());
-  return 0;
-}
-//=====================================================================================
-static bool wait(uint32_t msec = 10) {
-  // wait 1 msec
-  struct timespec tim;
-  tim.tv_sec = msec / 1000;
-  tim.tv_nsec = (msec * 1000000) % 1000000000;  // 1 ms
-  int rc = nanosleep(&tim, NULL);
-  if (rc) WARN("nanosleep()= %s (%d)", strerror(errno), errno);
-  return rc == 0;
-}
-static bool setBit(int fd, int flags) {
-  int rc = ioctl(fd, TIOCMBIS, &flags);  // set DTR pin
-  if (rc) WARN("ioctl()= %s (%d)", strerror(errno), errno);
-  return rc == 0;
-}
-static bool clrBit(int fd, int flags) {
-  int rc = ioctl(fd, TIOCMBIC, &flags);
-  if (rc) WARN("ioctl()= %s (%d)", strerror(errno), errno);
-  return rc == 0;
-}
-//=====================================================================================
-/*
-DTR   RTS   ENABLE  IO0  Mode
-1     1     1       1     RUN
-0     0     1       1     RUN
-1     0     0       0     RESET
-0     1     1       0     PROGRAM
-*/
-bool Serial::modeRun() {
-  // RESET & RUN
-  return wait(10) && setBit(_fd, TIOCM_DTR) && clrBit(_fd, TIOCM_RTS) &&
-         wait(10) && setBit(_fd, TIOCM_RTS) && setBit(_fd, TIOCM_DTR) &&
-         wait(10);
-}
-//=====================================================================================
-bool Serial::modeProgram() {
-  // RESET & PROG
-  return wait(10) && setBit(_fd, TIOCM_DTR) && clrBit(_fd, TIOCM_RTS) &&
-         wait(10) && setBit(_fd, TIOCM_RTS) && clrBit(_fd, TIOCM_DTR) &&
-         wait(10);
-}

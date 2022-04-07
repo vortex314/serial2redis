@@ -1,7 +1,6 @@
 #ifndef __COMMON_H__
 #define __COMMON_H__
 #include <ArduinoJson.h>
-#include <Fnv.h>
 #include <async.h>
 #include <hiredis.h>
 

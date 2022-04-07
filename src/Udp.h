@@ -15,25 +15,7 @@
 typedef std::vector<uint8_t> Bytes;
 
 #define PORT 8080
-#define MAXLINE 1500
-
-template <typename T>
-struct Try {
- public:
-  int rc;
-  T t;
-  static Try Success(T t) {
-    Try tr = {0, t};
-    return tr;
-  }
-  static Try Fail(int err) {
-    Try tr;
-    tr.rc = err;
-    return tr;
-  }
-  bool failed() { return rc != 0; }
-  bool success() { return rc != 0; }
-};
+#define MAXLINE 1472
 
 struct UdpAddress {
   in_addr_t ip;
@@ -43,7 +25,6 @@ struct UdpAddress {
   }
   UdpAddress() {};
   UdpAddress(std::string ip, uint16_t port);
-  static bool fromUri(UdpAddress &, std::string);
   /* bool operator()(const UdpAddress &lhs, const UdpAddress &rhs) const {
      return false;
    }*/
@@ -52,11 +33,11 @@ struct UdpAddress {
     if (rc) return rc == -1;
     return other.port < port;
   }
-  /*UdpAddress& operator=(const UdpAddress& rhs){
+  UdpAddress& operator=(const UdpAddress& rhs){
     port = rhs.port;
     memcpy(&ip,&rhs.ip,sizeof( in_addr_t));
     return *this;
-  }*/
+  }
   std::string toString() const;
 };
 
