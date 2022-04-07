@@ -1,17 +1,27 @@
 {
-    "redis" :{
+    "redis": {
         "host": "localhost",
         "port": 6379
     },
-    "udp":{
-        "net":"0.0.0.0",
+    "udp": {
+        "net": "0.0.0.0",
         "port": 9999
+    },
+    "serial": {
+        "port": "/dev/ttyUSB0",
+        "baudrate": 921600
     },
     "proxy": {
         "timeout": 5000,
         "log": {
             "level": "warn",
-            "file": "./logs/proxy.log"
-        }
+            "file": "./proxy.log"
+        },
+        "commands": [
+            "HELLO 3",
+            "CLIENT SETNAME USB0",
+            "CLIENT REPLY OFF",
+            "PUBLISH src/redis/proxy $config"
+        ]
     }
 }
