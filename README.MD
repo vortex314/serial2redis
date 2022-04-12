@@ -1,4 +1,6 @@
 # TLDR;
+<img src="doc/serial2redis.png" width="600" title="serial2redis">
+
 Hit the ground running example !
 Take you favorite Arduino and plug it in. 
 ```
