@@ -31,7 +31,7 @@ Framing::Framing(const char* delimiter, size_t maxFrameLength) {
   _maxFrameLength = maxFrameLength;
   _delimiter = delimiter;
 
-  _frame = LambdaFlow<Bytes, Bytes>([&](Bytes& out, const Bytes& in) {
+  _frame = * new LambdaFlow<Bytes, Bytes>([&](Bytes& out, const Bytes& in) {
     //    for (auto c : _delimiter) out.push_back(c);
     out.insert(out.end(), in.begin(), in.end());
     for (auto c : _delimiter) out.push_back(c);

@@ -11,8 +11,12 @@
             "name": "g++ - Build and debug active file",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/udp2redis",
-            "args": [],
+            "program": "${workspaceFolder}/build/serial2redis",
+            "args": [
+                "-f",
+                "src/serial2redis.json",
+                "-v"
+            ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
@@ -32,13 +36,8 @@
             "name": "g++ - Build and debug active file",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/serial2redis",
-            "args": [
-                "-s",
-                "/dev/ttyUSB0",
-                "-b",
-                "921600"
-            ],
+            "program": "${workspaceFolder}/build/udp2redis",
+            "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],

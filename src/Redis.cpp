@@ -4,7 +4,7 @@
 struct RedisReplyContext {
   std::string command;
   Redis *me;
-  RedisReplyContext( const std::string &command,Redis *me)
+  RedisReplyContext(const std::string &command, Redis *me)
       : command(command), me(me) {
     DEBUG("new RedisReplyContext %X", this);
   }
@@ -65,14 +65,18 @@ Redis::Redis(Thread &thread, JsonObject config)
     const char *argv[100];
     int argc;
     for (int i = 0; i < array.size(); i++) {
-      if (!array[i].is<const char *>()) return;
-      argv[i] = array[i].as<const char *>();
+      if (!array[i].is<const char *>()) {
+        WARN("Redis:request  %s not a string array", s.c_str());
+        return;
+      } else
+        argv[i] = array[i].as<const char *>();
     }
     argc = array.size();
     int rc = redisAsyncCommandArgv(_ac, replyHandler,
                                    new RedisReplyContext(argv[0], this), argc,
                                    argv, NULL);
-    if (rc) WARN("redisAsyncCommandArgv() failed %d : %s ",_ac->err,_ac->errstr);
+    if (rc)
+      WARN("redisAsyncCommandArgv() failed %d : %s ", _ac->err, _ac->errstr);
   });
   _request >> _jsonToRedis;
 };
@@ -181,7 +185,7 @@ void Redis::replyHandler(redisAsyncContext *ac, void *repl, void *pv) {
   std::string str;
   serializeJson(doc, str);
   DEBUG("Redis:reply %X '%s' =>  %s ", redisReplyContext,
-       redisReplyContext->command.c_str(), str.c_str());
+        redisReplyContext->command.c_str(), str.c_str());
   delete redisReplyContext;
 }
 
