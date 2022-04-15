@@ -14,8 +14,7 @@
             "program": "${workspaceFolder}/build/serial2redis",
             "args": [
                 "-f",
-                "src/serial2redis.json",
-                "-v"
+                "src/serial2redis.json"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

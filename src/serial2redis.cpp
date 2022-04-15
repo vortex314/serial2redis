@@ -23,7 +23,6 @@ std::string loadFile(const char *name);
 bool loadConfig(JsonObject cfg, int argc, char **argv);
 void deepMerge(JsonVariant dst, JsonVariantConst src);
 
-
 //================================================================
 
 //==========================================================================
@@ -52,7 +51,7 @@ int main(int argc, char **argv) {
         if (rc != DeserializationError::Ok) {
           INFO("RXD : %s%s%s", ColorOrange, s.c_str(), ColorDefault);
         } else {
-          DEBUG("RXD : '%s'", s.c_str());
+          INFO("RXD : '%s'", s.c_str());
         }
         return rc == DeserializationError::Ok;
       });
@@ -61,7 +60,7 @@ int main(int argc, char **argv) {
       new LambdaFlow<Json, Bytes>([&](Bytes &msg, const Json &docIn) {
         std::string str;
         size_t sz = serializeJson(docIn, str);
-        DEBUG("TXD : '%s'", str.c_str());
+        INFO("TXD : '%s'", str.c_str());
         msg = Bytes(str.begin(), str.end());
         return str.size() > 0;
       });
@@ -75,6 +74,9 @@ int main(int argc, char **argv) {
   } else if (framing == "ppp") {
     serial.incoming() >> ppp.deframe() >> bytesToJson >> redis.request();
     redis.response() >> jsonToBytes >> ppp.frame() >> serial.outgoing();
+    ppp.garbage() >> [&](const Bytes &bs) {
+      INFO("RXD : %s%s%s", ColorOrange, charDump(bs).c_str(), ColorDefault);
+    };
 
   } else {
     WARN("unknown framing : %s ", framing.c_str());
@@ -85,7 +87,6 @@ int main(int argc, char **argv) {
 
   workerThread.run();
 }
-
 
 bool loadConfig(JsonObject cfg, int argc, char **argv) {
   // defaults
@@ -138,7 +139,6 @@ bool loadConfig(JsonObject cfg, int argc, char **argv) {
   INFO("config:%s", s.c_str());
   return true;
 };
-
 
 void deepMerge(JsonVariant dst, JsonVariantConst src) {
   if (src.is<JsonObject>()) {
