@@ -174,7 +174,7 @@ void Redis::replyHandler(redisAsyncContext *ac, void *repl, void *pv) {
   RedisReplyContext *redisReplyContext = (RedisReplyContext *)pv;
   Redis *redis = redisReplyContext->me;
 
-  if (redis->_addReplyContext) {
+  if (redis->_addReplyContext && redisReplyContext->command != "psubscribe") {
     doc[0] = redisReplyContext->command;
     replyToJson(doc[1].to<JsonVariant>(), reply);
   } else {

@@ -3,7 +3,10 @@
         "host": "localhost",
         "port": 6379,
         "addReplyContext": true,
-        "reconnectOnConnectionLoss": true
+        "reconnectOnConnectionLoss": true,
+        "ignore-replies": [
+            "publish"
+        ]
     },
     "serial": {
         "port": "/dev/ttyUSB0",
@@ -16,8 +19,7 @@
             "level": "warn",
             "file": "./proxy.log"
         },
-        "commands": [
-            "HELLO 3",
+        "init-commands": [
             "CLIENT SETNAME USB0",
             "CLIENT REPLY OFF",
             "PUBLISH src/redis/proxy $config"

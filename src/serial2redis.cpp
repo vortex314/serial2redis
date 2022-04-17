@@ -40,7 +40,7 @@ int main(int argc, char **argv) {
   serial.connect();
 
   Framing crlf("\r\n", 10000);
-  PPP ppp(1024);
+  PPP ppp(workerThread, 1024);
 
   auto bytesToJson =
       new LambdaFlow<Bytes, Json>([&](Json &docIn, const Bytes &frame) {
@@ -49,9 +49,10 @@ int main(int argc, char **argv) {
         docIn.clear();
         auto rc = deserializeJson(docIn, s);
         if (rc != DeserializationError::Ok) {
-          INFO("RXD : %s%s%s", ColorOrange, s.c_str(), ColorDefault);
+          INFO("RXD[%d] : %s%s%s", s.length(), ColorOrange, s.c_str(),
+               ColorDefault);
         } else {
-          INFO("RXD : '%s'", s.c_str());
+          INFO("RXD[%d] : '%s'", s.length(), s.c_str());
         }
         return rc == DeserializationError::Ok;
       });
@@ -60,7 +61,7 @@ int main(int argc, char **argv) {
       new LambdaFlow<Json, Bytes>([&](Bytes &msg, const Json &docIn) {
         std::string str;
         size_t sz = serializeJson(docIn, str);
-        INFO("TXD : '%s'", str.c_str());
+        INFO("TXD[%d] : '%s'", str.length(), str.c_str());
         msg = Bytes(str.begin(), str.end());
         return str.size() > 0;
       });
@@ -75,7 +76,8 @@ int main(int argc, char **argv) {
     serial.incoming() >> ppp.deframe() >> bytesToJson >> redis.request();
     redis.response() >> jsonToBytes >> ppp.frame() >> serial.outgoing();
     ppp.garbage() >> [&](const Bytes &bs) {
-      INFO("RXD : %s%s%s", ColorOrange, charDump(bs).c_str(), ColorDefault);
+      INFO("RXD[%d] : %s%s%s", bs.size(), ColorOrange, charDump(bs).c_str(),
+           ColorDefault);
     };
 
   } else {
