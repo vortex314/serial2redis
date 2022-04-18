@@ -1,5 +1,6 @@
 #include <Redis.h>
 #include <assert.h>
+#include <algorithm>
 
 struct RedisReplyContext {
   std::string command;
@@ -51,7 +52,16 @@ Redis::Redis(Thread &thread, JsonObject config)
   _redisHost = config["host"] | "localhost";
   _redisPort = config["port"] | 6379;
   _reconnectOnConnectionLoss = config["reconnectOnConnectionLoss"] | true;
+
   _addReplyContext = config["addReplyContext"] | false;
+
+  if (config["ignore-replies"].is<JsonArray>()) {
+    JsonArray ignoreReplies = config["ignore-replies"].as<JsonArray>();
+    for (JsonArray::iterator it = ignoreReplies.begin();
+         it != ignoreReplies.end(); ++it) {
+      _ignoreReplies.push_back(it->as<std::string>());
+    }
+  }
   _ac = 0;
 
   _jsonToRedis = new SinkFunction<Json>([&](const Json &docIn) {
@@ -173,7 +183,13 @@ void Redis::replyHandler(redisAsyncContext *ac, void *repl, void *pv) {
 
   RedisReplyContext *redisReplyContext = (RedisReplyContext *)pv;
   Redis *redis = redisReplyContext->me;
+  std::string command = redisReplyContext->command;
 
+  if (std::find(redis->_ignoreReplies.begin(), redis->_ignoreReplies.end(),
+                command) != redis->_ignoreReplies.end()) {
+    delete redisReplyContext;
+    return;
+  }
   if (redis->_addReplyContext && redisReplyContext->command != "psubscribe") {
     doc[0] = redisReplyContext->command;
     replyToJson(doc[1].to<JsonVariant>(), reply);

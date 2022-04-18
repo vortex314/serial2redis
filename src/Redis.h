@@ -17,6 +17,7 @@ class Redis : public Actor {
   bool _reconnectOnConnectionLoss;
   bool _addReplyContext;
   SinkFunction<Json> *_jsonToRedis;
+  std::vector<std::string> _ignoreReplies;
 
  public:
   Redis(Thread &thread, JsonObject config);
