@@ -55,8 +55,8 @@ Redis::Redis(Thread &thread, JsonObject config)
 
   _addReplyContext = config["addReplyContext"] | false;
 
-  if (config["ignore-replies"].is<JsonArray>()) {
-    JsonArray ignoreReplies = config["ignore-replies"].as<JsonArray>();
+  if (config["ignoreReplies"].is<JsonArray>()) {
+    JsonArray ignoreReplies = config["ignoreReplies"].as<JsonArray>();
     for (JsonArray::iterator it = ignoreReplies.begin();
          it != ignoreReplies.end(); ++it) {
       _ignoreReplies.push_back(it->as<std::string>());
@@ -68,8 +68,8 @@ Redis::Redis(Thread &thread, JsonObject config)
     //    if (!_connected()) return; // otherwise first message lost
     std::string s;
     serializeJson(docIn, s);
-    DEBUG("Redis:request  %s ", s.c_str());
-    if (!docIn.is<JsonArray>()) return;
+    INFO("Redis:request  %s ", s.c_str());
+  //  if (!docIn.is<JsonArray>()) return;
     Json *js = (Json *)&docIn;
     JsonArray array = js->as<JsonArray>();
     const char *argv[100];

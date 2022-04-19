@@ -21,7 +21,7 @@ Log logger;
 //====================================================
 std::string loadFile(const char *name);
 bool loadConfig(JsonObject cfg, int argc, char **argv);
-void deepMerge(JsonVariant dst, JsonVariantConst src);
+void deepMerge(JsonVariant dst, JsonVariant src);
 
 //================================================================
 class RedisProxy : public Actor {
@@ -150,7 +150,7 @@ Sink<std::string> &RedisProxy::toRedis() { return _toRedis; }
 Source<std::string> &RedisProxy::fromRedis() { return _fromRedis; }
 uint64_t RedisProxy::inactivity() { return Sys::millis() - _lastMessage; }
 
-void deepMerge(JsonVariant dst, JsonVariantConst src) {
+void deepMerge(JsonVariant dst, JsonVariant src) {
   if (src.is<JsonObject>()) {
     for (auto kvp : src.as<JsonObject>()) {
       deepMerge(dst.getOrAddMember(kvp.key()), kvp.value());

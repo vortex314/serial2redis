@@ -21,7 +21,7 @@ Log logger;
 
 std::string loadFile(const char *name);
 bool loadConfig(JsonObject cfg, int argc, char **argv);
-void deepMerge(JsonVariant dst, JsonVariantConst src);
+void deepMerge(JsonVariant dst, JsonVariant src);
 
 //================================================================
 
@@ -142,7 +142,7 @@ bool loadConfig(JsonObject cfg, int argc, char **argv) {
   return true;
 };
 
-void deepMerge(JsonVariant dst, JsonVariantConst src) {
+void deepMerge(JsonVariant dst, JsonVariant src) {
   if (src.is<JsonObject>()) {
     for (auto kvp : src.as<JsonObject>()) {
       deepMerge(dst.getOrAddMember(kvp.key()), kvp.value());

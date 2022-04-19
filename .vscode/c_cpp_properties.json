@@ -6,7 +6,8 @@
                 "${workspaceFolder}/../limero/inc/",
                 "${workspaceFolder}/../ArduinoJson/src",
                 "${workspaceFolder}/hiredis",
-                "${workspaceFolder}/src"
+                "${workspaceFolder}/src",
+                "${workspaceFolder}/seasocks/src/main/c"
             ],
             "defines": [
                 "__linux__",

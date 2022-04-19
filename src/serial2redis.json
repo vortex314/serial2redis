@@ -4,8 +4,13 @@
         "port": 6379,
         "addReplyContext": true,
         "reconnectOnConnectionLoss": true,
-        "ignore-replies": [
+        "ignoreReplies": [
             "publish"
+        ],
+        "initCommands": [
+            "CLIENT REPLY OFF",
+            "CLIENT SETNAME USB0",
+            "CLIENT REPLY ON"
         ]
     },
     "serial": {
@@ -18,11 +23,6 @@
         "log": {
             "level": "warn",
             "file": "./proxy.log"
-        },
-        "init-commands": [
-            "CLIENT SETNAME USB0",
-            "CLIENT REPLY OFF",
-            "PUBLISH src/redis/proxy $config"
-        ]
+        }
     }
 }
