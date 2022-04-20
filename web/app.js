@@ -9,6 +9,7 @@ $(function begin() {
     $('#form').submit(function onSubmit(e) {
         var ci = $('#chat-input');
         ws.send(JSON.stringify(["HELLO", "3"]))
+        ws.send(JSON.stringify(["PSUBSCRIBE", "*"]))
         //       ws.send(ci.val());
         ci.val("");
         e.preventDefault();

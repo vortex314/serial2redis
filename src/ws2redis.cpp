@@ -40,8 +40,8 @@ using namespace seasocks;
 
 Log logger;
 Thread workerThread("worker");
+Server server(std::make_shared<PrintfLogger>());
 DynamicJsonDocument config(10240);
-
 class WsProxy {
   Redis* _redis;
   WebSocket* _ws;
@@ -72,7 +72,7 @@ struct Handler : WebSocket::Handler {
     proxy->redis()->response() >> [proxy](const Json& json) {
       std::string str;
       serializeJson(json, str);
-      proxy->ws()->send(str.c_str());
+      server.execute([proxy, str] { proxy->ws()->send(str.c_str()); });
     };
   }
   void onDisconnect(WebSocket* con) override {
@@ -120,8 +120,6 @@ bool checkDir() {
 }
 
 int main(int /*argc*/, const char* /*argv*/[]) {
-
-  Server server(std::make_shared<PrintfLogger>());
   server.addPageHandler(std::make_shared<MyAuthHandler>());
   server.addWebSocketHandler("/redis", std::make_shared<Handler>());
   workerThread.start();
