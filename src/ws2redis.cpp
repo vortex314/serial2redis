@@ -122,7 +122,11 @@ bool checkDir() {
 int main(int /*argc*/, const char* /*argv*/[]) {
   server.addPageHandler(std::make_shared<MyAuthHandler>());
   server.addWebSocketHandler("/redis", std::make_shared<Handler>());
-  workerThread.start();
-  server.serve("/home/lieven/workspace/serial2redis/web", 9000);
+  server.setStaticPath("/home/lieven/workspace/serial2redis/web");
+  server.startListening(9000);
+  workerThread.addReadInvoker(server.fd(), &server,
+                              [](void* srv) { ((Server*)srv)->poll(2); });
+  workerThread.run();
+  //  server.serve("/home/lieven/workspace/serial2redis/web", 9000);
   return 0;
 }
