@@ -1,5 +1,6 @@
 #include <Redis.h>
 #include <assert.h>
+
 #include <algorithm>
 
 struct RedisReplyContext {
@@ -53,7 +54,7 @@ Redis::Redis(Thread &thread, JsonObject config)
   _redisPort = config["port"] | 6379;
   _reconnectOnConnectionLoss = config["reconnectOnConnectionLoss"] | true;
 
-  _addReplyContext = config["addReplyContext"] | false;
+  _addReplyContext = config["addReplyContext"] | true;
 
   if (config["ignoreReplies"].is<JsonArray>()) {
     JsonArray ignoreReplies = config["ignoreReplies"].as<JsonArray>();
@@ -69,7 +70,7 @@ Redis::Redis(Thread &thread, JsonObject config)
     std::string s;
     serializeJson(docIn, s);
     INFO("Redis:request  %s ", s.c_str());
-  //  if (!docIn.is<JsonArray>()) return;
+    //  if (!docIn.is<JsonArray>()) return;
     Json *js = (Json *)&docIn;
     JsonArray array = js->as<JsonArray>();
     const char *argv[100];
@@ -170,7 +171,7 @@ void Redis::replyHandler(redisAsyncContext *ac, void *repl, void *pv) {
     WARN(" replyHandler caught null %d : %s ", ac->err, ac->errstr);
     return;  // disconnect ?
   };
-  if (reply->type == REDIS_REPLY_PUSH &&
+  if ((reply->type == REDIS_REPLY_ARRAY || reply->type == REDIS_REPLY_PUSH) &&
       strcmp(reply->element[0]->str, "pmessage") == 0) {  // no context
     Redis *redis = (Redis *)ac->c.privdata;
     replyToJson(doc.as<JsonVariant>(), reply);

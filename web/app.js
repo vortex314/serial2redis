@@ -24,6 +24,7 @@ $(function begin() {
         console.log('onclose');
     };
     ws.onmessage = function (message) {
+        console.log(JSON.parse(message.data));
         add(message.data);
     };
     ws.onerror = function (error) {
