@@ -7,3 +7,6 @@
 [submodule "seasocks"]
 	path = seasocks
 	url = https://github.com/mattgodbolt/seasocks
+[submodule "limero"]
+	path = limero
+	url = https://github.com/vortex314/limero
