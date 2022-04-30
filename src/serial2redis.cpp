@@ -1,5 +1,4 @@
 #include <ArduinoJson.h>
-#include <Common.h>
 #include <Frame.h>
 #include <Framing.h>
 #include <Log.h>
