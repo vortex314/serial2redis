@@ -25,7 +25,7 @@
 
 #include <Log.h>
 #include <Redis.h>
-
+#include <ConfigFile.h>
 #include <memory>
 #include <set>
 #include <string>
@@ -40,14 +40,15 @@ using namespace seasocks;
 Log logger;
 Thread workerThread("worker");
 Server server(std::make_shared<PrintfLogger>());
-DynamicJsonDocument config(10240);
+DynamicJsonDocument redisConfig(10240);
+
 class WsProxy {
   Redis* _redis;
   WebSocket* _ws;
 
  public:
   WsProxy(WebSocket* ws) : _ws(ws) {
-    _redis = new Redis(workerThread, config.to<JsonObject>());
+    _redis = new Redis(workerThread, redisConfig.to<JsonObject>());
     _redis->connect();
   }
   ~WsProxy() {
@@ -118,14 +119,28 @@ bool checkDir() {
   return true;
 }
 
-int main(int /*argc*/, const char* /*argv*/[]) {
+int main(int argc,  char** argv) {
+  INFO("Loading configuration.");
+  DynamicJsonDocument config(10240);
+  loadConfig(config.to<JsonObject>(), argc, argv);
+
+  int port = config["web"]["port"] | 9000;
+  std::string webDir = config["web"]["dir"] | ".";
+  std::string webRedisUrl = config["web"]["socket"] | "/redis";
+  std::string webInterface = config["web"]["interface"] | "0.0.0.0";
+  std::string redisHost = config["broker"]["host"] | "localhost";
+  uint16_t redisPort = config["broker"]["port"] | 6379;
+  redisConfig["host"] = redisHost;
+  redisConfig["port"] = redisPort;
+
   server.addPageHandler(std::make_shared<MyAuthHandler>());
-  server.addWebSocketHandler("/redis", std::make_shared<Handler>());
-  server.setStaticPath("/home/lieven/workspace/serial2redis/web");
-  server.startListening(9000);
+  server.addWebSocketHandler(webRedisUrl.c_str(), std::make_shared<Handler>());
+  server.setStaticPath(webDir.c_str());
+  server.startListening(port);
   workerThread.addReadInvoker(server.fd(), &server,
                               [](void* srv) { ((Server*)srv)->poll(2); });
   workerThread.run();
   //  server.serve("/home/lieven/workspace/serial2redis/web", 9000);
   return 0;
 }
+"web

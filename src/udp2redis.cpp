@@ -49,6 +49,11 @@ class RedisProxy : public Actor {
 int main(int argc, char **argv) {
   INFO("%s start.", argv[0]);
   DynamicJsonDocument config(10240);
+  config["udp"]["port"] = 9999;
+  config["udp"]["net"] = "0.0.0.0";
+  config["redis"]["host"] = "localhost";
+  config["redis"]["port"] = 6379;
+  config["proxy"]["timeout"] = 5000;
   loadConfig(config.to<JsonObject>(), argc, argv);
   Thread workerThread("worker");
   uint32_t proxyTimeout = config["proxy"]["timeout"];
@@ -149,65 +154,4 @@ Sink<std::string> &RedisProxy::toRedis() { return _toRedis; }
 Source<std::string> &RedisProxy::fromRedis() { return _fromRedis; }
 uint64_t RedisProxy::inactivity() { return Sys::millis() - _lastMessage; }
 
-void deepMerge(JsonVariant dst, JsonVariant src) {
-  if (src.is<JsonObject>()) {
-    for (auto kvp : src.as<JsonObject>()) {
-      deepMerge(dst.getOrAddMember(kvp.key()), kvp.value());
-    }
-  } else {
-    dst.set(src);
-  }
-}
 
-bool loadConfig(JsonObject cfg, int argc, char **argv) {
-  cfg["udp"]["port"] = 9999;
-  cfg["udp"]["net"] = "0.0.0.0";
-  cfg["redis"]["host"] = "localhost";
-  cfg["redis"]["port"] = 6379;
-  cfg["proxy"]["timeout"] = 5000;
-
-  // override args
-  int c;
-  while ((c = getopt(argc, argv, "h:p:n:u:t:f:v")) != -1) {
-    switch (c) {
-      case 'u':
-        cfg["udp"]["port"] = atoi(optarg);
-        break;
-      case 'f': {
-        std::string s = loadFile(optarg);
-        DynamicJsonDocument doc(10240);
-        deserializeJson(doc, s);
-        deepMerge(cfg, doc);
-        break;
-      }
-      case 'n':
-        cfg["udp"]["net"] = optarg;
-        break;
-      case 'h':
-        cfg["broker"]["host"] = optarg;
-        break;
-      case 't':
-        cfg["proxy"]["timeout"] = atoi(optarg);
-        break;
-      case 'p':
-        cfg["broker"]["port"] = atoi(optarg);
-        break;
-      case 'v': {
-        logger.setLevel(Log::L_DEBUG);
-        break;
-      }
-      case '?':
-        printf("Usage %s -h <host> -p <port> -s <serial_port> -b <baudrate>\n",
-               argv[0]);
-        break;
-      default:
-        WARN("Usage %s -h <host> -p <port> -s <serial_port> -b <baudrate>\n",
-             argv[0]);
-        abort();
-    }
-  }
-  std::string str;
-  serializeJson(cfg, str);
-  INFO("%s", str.c_str());
-  return true;
-};

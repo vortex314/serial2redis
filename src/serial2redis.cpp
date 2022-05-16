@@ -11,6 +11,7 @@
 #include <hiredis.h>
 #include <limero.h>
 #include <stdio.h>
+#include <ConfigFile.h>
 
 #include <thread>
 #include <unordered_map>
@@ -18,9 +19,7 @@
 
 Log logger;
 
-std::string loadFile(const char *name);
-bool loadConfig(JsonObject cfg, int argc, char **argv);
-void deepMerge(JsonVariant dst, JsonVariant src);
+
 
 //================================================================
 
@@ -28,6 +27,12 @@ void deepMerge(JsonVariant dst, JsonVariant src);
 int main(int argc, char **argv) {
   INFO("Loading configuration.");
   DynamicJsonDocument config(10240);
+  config["serial"]["port"] = "/dev/ttyUSB0";
+  config["serial"]["baudrate"] = 115200;
+  config["serial"]["frame"] = "crlf";
+  config["broker"]["host"] = "localhost";
+  config["broker"]["port"] = 6379;
+  config["proxy"]["timeout"] = 5000;
   loadConfig(config.to<JsonObject>(), argc, argv);
   Thread workerThread("worker");
 
@@ -87,66 +92,4 @@ int main(int argc, char **argv) {
   printf("%s%s%s\n", ColorOrange, "Orange", ColorDefault);
 
   workerThread.run();
-}
-
-bool loadConfig(JsonObject cfg, int argc, char **argv) {
-  // defaults
-  cfg["serial"]["port"] = "/dev/ttyUSB0";
-  cfg["serial"]["baudrate"] = 115200;
-  cfg["serial"]["frame"] = "crlf";
-  cfg["broker"]["host"] = "localhost";
-  cfg["broker"]["port"] = 6379;
-  cfg["proxy"]["timeout"] = 5000;
-  // override args
-  int c;
-  while ((c = getopt(argc, argv, "h:p:s:b:f:t:v")) != -1) switch (c) {
-      case 'b':
-        cfg["serial"]["baudrate"] = atoi(optarg);
-        break;
-      case 's':
-        cfg["serial"]["port"] = optarg;
-        break;
-      case 'f': {
-        std::string s = loadFile(optarg);
-        DynamicJsonDocument doc(10240);
-        deserializeJson(doc, s);
-        deepMerge(cfg, doc);
-        break;
-      }
-      case 'h':
-        cfg["broker"]["host"] = optarg;
-        break;
-      case 'p':
-        cfg["broker"]["port"] = atoi(optarg);
-        break;
-      case 't':
-        cfg["proxy"]["timeout"] = atoi(optarg);
-        break;
-      case 'v': {
-        logger.setLevel(Log::L_DEBUG);
-        break;
-      }
-      case '?':
-        printf("Usage %s -h <host> -p <port> -s <serial_port> -b <baudrate>\n",
-               argv[0]);
-        break;
-      default:
-        WARN("Usage %s -h <host> -p <port> -s <serial_port> -b <baudrate>\n",
-             argv[0]);
-        abort();
-    }
-  std::string s;
-  serializeJson(cfg, s);
-  INFO("config:%s", s.c_str());
-  return true;
-};
-
-void deepMerge(JsonVariant dst, JsonVariant src) {
-  if (src.is<JsonObject>()) {
-    for (auto kvp : src.as<JsonObject>()) {
-      deepMerge(dst.getOrAddMember(kvp.key()), kvp.value());
-    }
-  } else {
-    dst.set(src);
-  }
 }

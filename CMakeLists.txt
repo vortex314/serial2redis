@@ -28,7 +28,7 @@ include_directories(
 
 target_sources(serial2redis PRIVATE 
     src/serial2redis.cpp 
-    src/config.cpp 
+    src/ConfigFile.cpp 
     src/SessionSerial.cpp
     src/serial.cpp 
     ${LIMERO}/linux/Redis.cpp
@@ -43,7 +43,7 @@ target_sources(serial2redis PRIVATE
 
 target_sources(ws2redis PRIVATE 
     src/ws2redis.cpp 
-    src/config.cpp 
+    src/ConfigFile.cpp 
     ${LIMERO}/linux/Redis.cpp
     ${LIMERO}/linux/Log.cpp
     ${LIMERO}/linux/Sys.cpp
@@ -55,7 +55,7 @@ target_sources(ws2redis PRIVATE
 target_sources(udp2redis PRIVATE 
     src/udp2redis.cpp 
     ${LIMERO}/linux/Redis.cpp
-    src/config.cpp 
+    src/ConfigFile.cpp 
     src/SessionUdp.cpp
     src/Udp.cpp 
     ${LIMERO}/linux/Log.cpp
