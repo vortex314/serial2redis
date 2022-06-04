@@ -143,4 +143,3 @@ int main(int argc,  char** argv) {
   //  server.serve("/home/lieven/workspace/serial2redis/web", 9000);
   return 0;
 }
-"web
