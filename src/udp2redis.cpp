@@ -49,7 +49,7 @@ class RedisProxy : public Actor {
 int main(int argc, char **argv) {
   INFO("%s start.", argv[0]);
   DynamicJsonDocument config(10240);
-  config["udp"]["port"] = 9999;
+  config["udp"]["port"] = 9001;
   config["udp"]["net"] = "0.0.0.0";
   config["redis"]["host"] = "localhost";
   config["redis"]["port"] = 6379;
