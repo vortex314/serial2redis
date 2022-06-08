@@ -10,7 +10,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g ")
 set(CMAKE_C_FLAGS "${CMAKE_CXX_FLAGS} -g ")
 add_definitions(-DLINUX -std=c++17) # needed 17 for seasocks
 
-set(HIREDIS /home/lieven/workspace/serial2redis/hiredis )
+set(HIREDIS hiredis )
 set(LIMERO limero)
 set(ARDUINOJSON ArduinoJson/src)
 set(SEASOCKS seasocks)
@@ -68,20 +68,20 @@ target_sources(udp2redis PRIVATE
 
 target_link_libraries(serial2redis 
     -lpthread  
-    -L${HIREDIS} -l:libhiredis.a
+    -L../${HIREDIS} -l:libhiredis.a
     -lrt  
     -latomic)
 
 target_link_libraries(ws2redis 
     -lpthread  
-    -L/home/lieven/workspace/serial2redis/seasocks/build/src/main/c -l:libseasocks.a
+    -L../${SEASOCKS_LDIR} -l:libseasocks.a
     -lz
-    -L${HIREDIS} -l:libhiredis.a
+    -L../${HIREDIS} -l:libhiredis.a
     -lrt  
     -latomic)
 
 target_link_libraries(udp2redis 
     -lpthread  
-    -L${HIREDIS} -l:libhiredis.a
+    -L../${HIREDIS} -l:libhiredis.a
     -lrt  
     -latomic)
