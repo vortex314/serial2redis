@@ -10,7 +10,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g ")
 set(CMAKE_C_FLAGS "${CMAKE_CXX_FLAGS} -g ")
 add_definitions(-DLINUX -std=c++17) # needed 17 for seasocks
 
-set(HIREDIS hiredis )
+set(HIREDIS /home/lieven/workspace/serial2redis/hiredis )
 set(LIMERO limero)
 set(ARDUINOJSON ArduinoJson/src)
 set(SEASOCKS seasocks)

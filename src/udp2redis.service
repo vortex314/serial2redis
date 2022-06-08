@@ -10,7 +10,7 @@ Restart=always
 RestartSec=5
 User=root
 Group=root
-ExecStart=/home/lieven/workspace/serial2redis/build/udp2redis
+ExecStart=/home/lieven/workspace/serial2redis/build/udp2redis -f udp2redis.json
 WorkingDirectory=/home/lieven/workspace/serial2redis/src
 
 [Install]
