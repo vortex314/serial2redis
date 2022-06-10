@@ -23,5 +23,10 @@
             "CLIENT REPLY OFF",
             "PUBLISH src/redis/proxy $config"
         ]
+    },
+    "log": {
+        "prefix": "/var/log/proxy",
+        "count": 10,
+        "limit": 1048576
     }
 }

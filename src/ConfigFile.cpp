@@ -1,11 +1,12 @@
-#include "errno.h"
-#include <string.h>
-#include <stdio.h>
-#include <string>
 #include <ConfigFile.h>
+#include <stdio.h>
+#include <string.h>
+
+#include <string>
+
+#include "errno.h"
 
 std::string loadFile(const char *name) {
-
   std::string str = "{}";
 
   FILE *file = fopen(name, "r");
@@ -14,8 +15,7 @@ std::string loadFile(const char *name) {
     char buffer[256];
     while (true) {
       int result = fread(buffer, 1, 256, file);
-      if (result <= 0)
-        break;
+      if (result <= 0) break;
       str.append(buffer, result);
     }
     fclose(file);
@@ -24,7 +24,31 @@ std::string loadFile(const char *name) {
   }
   return str;
 }
+#include <LogFile.h>
+LogFile *logFile;
 
+void logConfig(JsonObject config) {
+  if (!config.containsKey("log")) return;
+  JsonObject logConfig = config["log"];
+  std::string level = logConfig["level"] | "info";
+  if (level == "debug") {
+    logger.setLevel(Log::L_DEBUG);
+  } else if (level == "info") {
+    logger.setLevel(Log::L_INFO);
+  } else if (level == "warn") {
+    logger.setLevel(Log::L_WARN);
+  } else if (level == "error") {
+    logger.setLevel(Log::L_ERROR);
+  }
+  if (logConfig["prefix"]) {
+    std::string prefix = logConfig["prefix"] | "logFile";
+    uint32_t count = logConfig["count"] | 5;
+    uint32_t limit = logConfig["limit"] | 1000000;
+    logFile = new LogFile(prefix.c_str(), count, limit);
+    logger.setWriter(
+        [](char *line, size_t length) { logFile->append(line, length); });
+  }
+}
 
 bool loadConfig(JsonObject cfg, int argc, char **argv) {
   // defaults
@@ -44,17 +68,16 @@ bool loadConfig(JsonObject cfg, int argc, char **argv) {
         break;
       }
       case '?':
-        printf("Usage %s -f<configFile.json>\n",
-               argv[0]);
+        printf("Usage %s -f<configFile.json>\n", argv[0]);
         break;
       default:
-        WARN("Usage %s -f<configFile.json>\n",
-             argv[0]);
+        WARN("Usage %s -f<configFile.json>\n", argv[0]);
         abort();
     }
   std::string s;
   serializeJson(cfg, s);
   INFO("config:%s", s.c_str());
+
   return true;
 };
 
@@ -67,4 +90,3 @@ void deepMerge(JsonVariant dst, JsonVariant src) {
     dst.set(src);
   }
 }
-
