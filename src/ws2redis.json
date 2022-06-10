@@ -1,6 +1,6 @@
 {
 	"web": {
-		"dir": ".",
+		"dir": "/home/lieven/dist",
 		"port": 9000,
 		"interface": "0.0.0.0",
 		"socket": "/redis"
@@ -8,5 +8,10 @@
 	"broker": {
 		"host": "localhost",
 		"port": 6379
+	},
+	"log": {
+		"prefix": "/var/log/ws2redis_",
+		"count": 10,
+		"limit": 1048576
 	}
 }

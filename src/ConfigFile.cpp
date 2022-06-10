@@ -27,6 +27,8 @@ std::string loadFile(const char *name) {
 #include <LogFile.h>
 LogFile *logFile;
 
+void logFileWriter(char *line, size_t length) { logFile->append(line, length); }
+
 void logConfig(JsonObject config) {
   if (!config.containsKey("log")) return;
   JsonObject logConfig = config["log"];
@@ -45,8 +47,8 @@ void logConfig(JsonObject config) {
     uint32_t count = logConfig["count"] | 5;
     uint32_t limit = logConfig["limit"] | 1000000;
     logFile = new LogFile(prefix.c_str(), count, limit);
-    logger.setWriter(
-        [](char *line, size_t length) { logFile->append(line, length); });
+    INFO("Logging to file %snn.log", prefix.c_str());
+    logger.setWriter(logFileWriter);
   }
 }
 
@@ -77,7 +79,7 @@ bool loadConfig(JsonObject cfg, int argc, char **argv) {
   std::string s;
   serializeJson(cfg, s);
   INFO("config:%s", s.c_str());
-
+  logConfig(cfg);
   return true;
 };
 

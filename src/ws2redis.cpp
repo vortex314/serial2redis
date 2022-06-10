@@ -23,9 +23,10 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
+#include <ConfigFile.h>
 #include <Log.h>
 #include <Redis.h>
-#include <ConfigFile.h>
+
 #include <memory>
 #include <set>
 #include <string>
@@ -39,7 +40,33 @@ using namespace seasocks;
 
 Log logger;
 Thread workerThread("worker");
-Server server(std::make_shared<PrintfLogger>());
+class MyLogger : public Logger {
+ public:
+  void log(Level level, const char* message) override {
+    switch (level) {
+      case Level::Debug:
+        DEBUG(message);
+        break;
+      case Level::Access:
+        INFO(message);
+        break;
+      case Level::Info:
+        INFO(message);
+        break;
+      case Level::Warning:
+        WARN(message);
+        break;
+      case Level::Error:
+        ERROR(message);
+        break;
+      case Level::Severe:
+        ERROR(message);
+        break;
+    }
+  }
+};
+
+Server server(std::make_shared<MyLogger>());
 DynamicJsonDocument redisConfig(10240);
 
 class WsProxy {
@@ -112,14 +139,13 @@ struct MyAuthHandler : PageHandler {
 bool checkDir() {
   std::string dir = seasocks::getWorkingDir();
   if (!seasocks::endsWith(dir, "seasocks")) {
-    std::cerr << "Samples must be run in the main seasocks directory"
-              << std::endl;
+    ERROR("Samples must be run in the main seasocks directory")
     return false;
   }
   return true;
 }
 
-int main(int argc,  char** argv) {
+int main(int argc, char** argv) {
   INFO("Loading configuration.");
   DynamicJsonDocument config(10240);
   loadConfig(config.to<JsonObject>(), argc, argv);
