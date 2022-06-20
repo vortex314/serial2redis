@@ -13,10 +13,11 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/ws2redis",
             "args": [
-                "web"
+                "-f",
+                "${workspaceFolder}/src/ws2redis.json",
             ],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/src",
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",

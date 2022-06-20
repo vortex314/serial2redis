@@ -26,14 +26,14 @@ Log logger;
 //==========================================================================
 int main(int argc, char **argv) {
   INFO("Loading configuration.");
-  DynamicJsonDocument config(10240);
+  Json config;
   config["serial"]["port"] = "/dev/ttyUSB0";
   config["serial"]["baudrate"] = 115200;
   config["serial"]["frame"] = "crlf";
   config["broker"]["host"] = "localhost";
   config["broker"]["port"] = 6379;
   config["proxy"]["timeout"] = 5000;
-  loadConfig(config.to<JsonObject>(), argc, argv);
+  configurator(config, argc, argv);
   Thread workerThread("worker");
 
   Redis redis(workerThread, config["redis"].as<JsonObject>());

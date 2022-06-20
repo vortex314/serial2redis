@@ -1,5 +1,6 @@
 
 #include <ArduinoJson.h>
+#include <ConfigFile.h>
 #include <Fnv.h>
 #include <Frame.h>
 #include <Log.h>
@@ -47,14 +48,16 @@ class RedisProxy : public Actor {
 
 //==========================================================================
 int main(int argc, char **argv) {
-  INFO("%s start.", argv[0]);
-  DynamicJsonDocument config(10240);
+  Json config;
   config["udp"]["port"] = 9001;
   config["udp"]["net"] = "0.0.0.0";
   config["redis"]["host"] = "localhost";
   config["redis"]["port"] = 6379;
   config["proxy"]["timeout"] = 5000;
-  loadConfig(config.to<JsonObject>(), argc, argv);
+  INFO("Loading configuration.");
+  configurator(config,argc, argv);
+  INFO("config:%s", config.toString());
+
   Thread workerThread("worker");
   uint32_t proxyTimeout = config["proxy"]["timeout"];
 
@@ -153,5 +156,3 @@ void RedisProxy::disconnect() { _redis.disconnect(); }
 Sink<std::string> &RedisProxy::toRedis() { return _toRedis; }
 Source<std::string> &RedisProxy::fromRedis() { return _fromRedis; }
 uint64_t RedisProxy::inactivity() { return Sys::millis() - _lastMessage; }
-
-

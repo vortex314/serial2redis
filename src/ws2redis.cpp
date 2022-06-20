@@ -67,7 +67,7 @@ class MyLogger : public Logger {
 };
 
 Server server(std::make_shared<MyLogger>());
-DynamicJsonDocument redisConfig(10240);
+Json config;
 
 class WsProxy {
   Redis* _redis;
@@ -75,7 +75,7 @@ class WsProxy {
 
  public:
   WsProxy(WebSocket* ws) : _ws(ws) {
-    _redis = new Redis(workerThread, redisConfig.to<JsonObject>());
+    _redis = new Redis(workerThread, config["redis"]);
     _redis->connect();
   }
   ~WsProxy() {
@@ -147,17 +147,21 @@ bool checkDir() {
 
 int main(int argc, char** argv) {
   INFO("Loading configuration.");
-  DynamicJsonDocument config(10240);
-  loadConfig(config.to<JsonObject>(), argc, argv);
+  config["web"]["port"] = 9000;
+  config["web"]["dir"] = ".";
+  config["web"]["socket"] = "/redis";
+  config["web"]["interface"] = "0.0.0.0";
+  config["redis"]["host"] = "localhost";
+  config["redis"]["port"] = 6379;
+  configurator(config, argc, argv);
+  std::string str;
+  serializeJson(config, str);
+  INFO("config:%s", str.c_str());
 
-  int port = config["web"]["port"] | 9000;
-  std::string webDir = config["web"]["dir"] | ".";
-  std::string webRedisUrl = config["web"]["socket"] | "/redis";
-  std::string webInterface = config["web"]["interface"] | "0.0.0.0";
-  std::string redisHost = config["broker"]["host"] | "localhost";
-  uint16_t redisPort = config["broker"]["port"] | 6379;
-  redisConfig["host"] = redisHost;
-  redisConfig["port"] = redisPort;
+  int port = config["web"]["port"];
+  std::string webDir = config["web"]["dir"];
+  std::string webRedisUrl = config["web"]["socket"];
+  std::string webInterface = config["web"]["interface"];
 
   server.addPageHandler(std::make_shared<MyAuthHandler>());
   server.addWebSocketHandler(webRedisUrl.c_str(), std::make_shared<Handler>());
