@@ -56,7 +56,9 @@ int main(int argc, char **argv) {
   config["proxy"]["timeout"] = 5000;
   INFO("Loading configuration.");
   configurator(config,argc, argv);
-  INFO("config:%s", config.toString());
+  std::string s;
+  serializeJson(config, s);
+  INFO("config:%s", s.c_str());
 
   Thread workerThread("worker");
   uint32_t proxyTimeout = config["proxy"]["timeout"];

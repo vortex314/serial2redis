@@ -11,10 +11,10 @@
             "name": "(gdb) Launch",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/ws2redis",
+            "program": "${workspaceFolder}/build/udp2redis",
             "args": [
                 "-f",
-                "${workspaceFolder}/src/ws2redis.json",
+                "${workspaceFolder}/src/udp2redis.json",
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/src",

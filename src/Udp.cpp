@@ -50,8 +50,8 @@ int Udp::receive(UdpMsg &rxd) {
     rxd.src.ip = clientaddr.sin_addr.s_addr;
     rxd.src.port = ntohs(clientaddr.sin_port);
     rxd.dst = _addr;
-  /*  INFO(" received from %s to %s  ", rxd.src.toString().c_str(),
-         rxd.dst.toString().c_str());*/
+    INFO(" received from %s to %s  ", rxd.src.toString().c_str(),
+         rxd.dst.toString().c_str());
     rxd.message = Bytes(buffer, buffer + rc);
     return 0;
   } else {
