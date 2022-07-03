@@ -19,10 +19,11 @@
         "frame": "ppp"
     },
     "proxy": {
-        "timeout": 5000,
-        "log": {
-            "level": "warn",
-            "file": "./proxy.log"
-        }
+        "timeout": 5000
+    },
+    "log": {
+        "prefix": "../log/serial2redis_",
+        "count": 10,
+        "limit": 1048576
     }
 }

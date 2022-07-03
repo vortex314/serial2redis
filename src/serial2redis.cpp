@@ -19,21 +19,16 @@
 
 Log logger;
 
-
-
-//================================================================
-
-//==========================================================================
 int main(int argc, char **argv) {
   INFO("Loading configuration.");
   Json config;
   config["serial"]["port"] = "/dev/ttyUSB0";
   config["serial"]["baudrate"] = 115200;
   config["serial"]["frame"] = "crlf";
-  config["broker"]["host"] = "localhost";
-  config["broker"]["port"] = 6379;
-  config["proxy"]["timeout"] = 5000;
+  config["redis"]["host"] = "localhost";
+  config["redis"]["port"] = 6379;
   configurator(config, argc, argv);
+  
   Thread workerThread("worker");
 
   Redis redis(workerThread, config["redis"].as<JsonObject>());
