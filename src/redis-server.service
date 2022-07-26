@@ -1,0 +1,30 @@
+; deployment config
+; please adapt for your environment the ExecStart and Workingdirectory
+[Unit]
+Description=Wiring WebSocket to redis 
+After=network.target
+StartLimitIntervalSec=0
+[Service]
+Type=simple
+Restart=always
+RestartSec=5
+User=root
+Group=root
+ExecStart=/usr/local/bin/redis-server --supervised systemd 
+## Alternatively, have redis-server load a configuration file:
+#ExecStart=/usr/local/bin/redis-server /path/to/your/redis.conf
+LimitNOFILE=10032
+NoNewPrivileges=yes
+#OOMScoreAdjust=-900
+#PrivateTmp=yes
+Type=notify
+TimeoutStartSec=infinity
+TimeoutStopSec=infinity
+UMask=0077
+#User=redis
+#Group=redis
+#WorkingDirectory=/var/lib/redis
+
+
+[Install]
+WantedBy=multi-user.target
