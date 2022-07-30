@@ -1,3 +1,5 @@
+sudo systemctl stop USB0redis
+sudo systemctl disable USB0redis
 sudo cp USB0redis.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl restart USB0redis

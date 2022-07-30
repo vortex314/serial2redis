@@ -1,9 +1,8 @@
-; deployment config
-; please adapt for your environment the ExecStart and Workingdirectory
 [Unit]
-Description=Wiring UDP to redis 
+Description=Serial /dev/ttyUSB0 to redis
 After=network.target
 StartLimitIntervalSec=0
+
 [Service]
 Type=simple
 Restart=always
