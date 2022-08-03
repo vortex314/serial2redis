@@ -25,7 +25,7 @@
         ]
     },
     "log": {
-        "prefix": "../log/udp2redis_",
+        "prefix": "/home/lieven/log/udp2redis_",
         "count": 10,
         "limit": 1048576
     }

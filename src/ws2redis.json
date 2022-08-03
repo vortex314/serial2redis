@@ -10,7 +10,7 @@
 		"port": 6379
 	},
 	"log": {
-		"prefix_dummy": "../log/ws2redis_",
+		"prefix": "/home/lieven/log/ws2redis_",
 		"count": 10,
 		"limit": 1048576
 	}

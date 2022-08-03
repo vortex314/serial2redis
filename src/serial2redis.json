@@ -22,7 +22,7 @@
         "timeout": 5000
     },
     "log": {
-        "prefix": "/home/lieven/workspace/serial2redis/log/serial2redis_",
+        "prefix": "/home/lieven/log/serial2redis_",
         "count": 10,
         "limit": 1048576
     }
