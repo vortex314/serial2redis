@@ -10,3 +10,6 @@
 [submodule "limero"]
 	path = limero
 	url = https://github.com/vortex314/limero
+[submodule "tinycbor"]
+	path = tinycbor
+	url = https://github.com/intel/tinycbor.git

@@ -12,6 +12,8 @@ add_definitions(-DLINUX -std=c++17) # needed 17 for seasocks
 
 set(HIREDIS hiredis )
 set(LIMERO limero)
+
+set(TINYCBOR tinycbor)
 set(ARDUINOJSON ArduinoJson/src)
 set(SEASOCKS seasocks)
 set(SEASOCKS_LDIR ${SEASOCKS}/build/src/main/c)
@@ -24,6 +26,7 @@ include_directories(
     ${HIREDIS}
     ${ARDUINOJSON}
     ${SEASOCKS_INC}
+    ${TINYCBOR}/src
     )
 
 target_sources(serial2redis PRIVATE 
@@ -34,6 +37,9 @@ target_sources(serial2redis PRIVATE
     ${LIMERO}/linux/Redis.cpp
     src/Framing.cpp
     ${LIMERO}/src/PPP.cpp
+    ${LIMERO}/src/CborDump.cpp
+    ${LIMERO}/src/CborSerializer.cpp
+    ${LIMERO}/src/CborDeserializer.cpp
     ${LIMERO}/linux/Log.cpp
     ${LIMERO}/linux/LogFile.cpp
     ${LIMERO}/linux/Sys.cpp
@@ -72,6 +78,7 @@ target_sources(udp2redis PRIVATE
 target_link_libraries(serial2redis 
     -lpthread  
     -L../${HIREDIS} -l:libhiredis.a
+    -L../${TINYCBOR} -l:libtinycbor.a
     -lrt  
     -latomic)
 

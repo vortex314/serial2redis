@@ -7,6 +7,7 @@
                 "${workspaceFolder}/limero/linux/",
                 "${workspaceFolder}/ArduinoJson/src",
                 "${workspaceFolder}/hiredis",
+                "${workspaceFolder}/tinycbor/src",
                 "${workspaceFolder}/src",
                 "${workspaceFolder}/seasocks/src/main/c"
             ],
