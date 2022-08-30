@@ -2,6 +2,10 @@ set -x
 cd ArduinoJson
 git checkout 6.x
 git pull
+cd ../tinycbor
+git checkout master
+git pull
+make
 cd ../hiredis
 git checkout master
 git pull

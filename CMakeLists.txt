@@ -78,7 +78,7 @@ target_sources(udp2redis PRIVATE
 target_link_libraries(serial2redis 
     -lpthread  
     -L../${HIREDIS} -l:libhiredis.a
-    -L../${TINYCBOR} -l:libtinycbor.a
+    -L../${TINYCBOR}/lib -l:libtinycbor.a
     -lrt  
     -latomic)
 

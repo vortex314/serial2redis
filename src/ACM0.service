@@ -1,0 +1,16 @@
+[Unit]
+Description=Serial /dev/ttyACM0 to redis
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=5
+User=root
+Group=root
+ExecStart=/home/lieven/workspace/serial2redis/build/serial2redis -f ACM0.json
+WorkingDirectory=/home/lieven/workspace/serial2redis/src
+
+[Install]
+WantedBy=multi-user.target

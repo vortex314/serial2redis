@@ -162,6 +162,17 @@ int main(int argc, char** argv) {
   std::string webDir = config["web"]["dir"];
   std::string webRedisUrl = config["web"]["socket"];
   std::string webInterface = config["web"]["interface"];
+  Redis* redis = new Redis(workerThread, config["redis"]);
+  redis->connect();
+  TimerSource* pinger = new TimerSource(workerThread, 1000, true, "pinger");
+  *pinger >> [&](const TimerMsg&) {
+    std::string systemAliveTopic = "src/ws2redis/system/alive";
+    Json systemAlive;
+    systemAlive[0] = "publish";
+    systemAlive[1] = systemAliveTopic;
+    systemAlive[2] = "true";
+    redis->request().on(systemAlive);
+  };
 
   server.addPageHandler(std::make_shared<MyAuthHandler>());
   server.addWebSocketHandler(webRedisUrl.c_str(), std::make_shared<Handler>());

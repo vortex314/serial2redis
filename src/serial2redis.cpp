@@ -44,6 +44,18 @@ int main(int argc, char **argv) {
   SessionSerial serial(workerThread, config["serial"].as<JsonObject>());
   serial.init();
   serial.connect();
+  string port = config["serial"]["port"];
+  TimerSource *pinger = new TimerSource(workerThread, 1000, true, "pinger");
+  *pinger >> [&](const TimerMsg &) {
+    std::string shortPort = port.substr(strlen("/dev/tty"));
+    std::string systemAliveTopic = "src/";
+    systemAliveTopic += shortPort + "/system/alive";
+    Json systemAlive;
+    systemAlive[0] = "publish";
+    systemAlive[1] = systemAliveTopic;
+    systemAlive[2] = "true";
+    redis.request().on(systemAlive);
+  };
 
   Framing crlf("\r\n", 10000);
   PPP ppp(workerThread, 1024);
@@ -111,19 +123,27 @@ int main(int argc, char **argv) {
           if (valueJson.is<std::string>()) {
             std::string value = valueJson.as<std::string>();
             ser.begin().add("pub").add(topic).add(value).end();
+          } else if (valueJson.is<int64_t>()) {
+            int64_t value = valueJson.as<int64_t>();
+            ser.begin().add("pub").add(topic).add(value).end();
           } else if (valueJson.is<uint64_t>()) {
             uint64_t value = valueJson.as<uint64_t>();
             ser.begin().add("pub").add(topic).add(value).end();
-          } 
-          else if (valueJson.is<std::string>()) {
+          } else if (valueJson.is<float>()) {
+            float value = valueJson.as<float>();
+            ser.begin().add("pub").add(topic).add(value).end();
+          } else if (valueJson.is<std::string>()) {
             std::string value = valueJson.as<std::string>();
+            ser.begin().add("pub").add(topic).add(value).end();
+          } else if (valueJson.is<bool>()) {
+            bool value = valueJson.as<bool>();
             ser.begin().add("pub").add(topic).add(value).end();
           } else {
             ser.begin().add("pub").add(topic).add(valueString).end();
           }
           msg = ser.toBytes();
           INFO("TXD : %s", cborToJson(msg).toString().c_str());
-          INFO("TXD : %s ",hexDump(ser.toBytes()).c_str());
+          INFO("TXD : %s ", hexDump(ser.toBytes()).c_str());
           return true;
         }
         return false;
@@ -168,14 +188,6 @@ int main(int argc, char **argv) {
     };
 
   } else if (framing == "ppp" && format == "cbor") {
-   /* TimerSource *pinger = new TimerSource(workerThread, 10000, true, "pinger");
-    *pinger >> [&](const TimerMsg &) {
-      CborSerializer serializer(1024);
-      Bytes bs = serializer.begin().add("ping").end().toBytes();
-      ppp.frame().on(bs);
-      INFO("TXD : %s ", cborDump(bs).c_str());
-    };*/
-
     serial.incoming() >> ppp.deframe() >> cborRequester;
     redis.response() >> cborResponder >> ppp.frame() >> serial.outgoing();
 

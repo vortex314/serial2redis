@@ -20,8 +20,8 @@
     "proxy": {
         "timeout": 5000
     },
-    "log-ignore": {
-        "prefix": "/home/lieven/log/serial2redis_",
+    "log": {
+        "prefix": "/home/lieven/log/ACM0_",
         "count": 10,
         "limit": 1048576
     }
