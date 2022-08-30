@@ -3,7 +3,7 @@ cd ArduinoJson
 git checkout 6.x
 git pull
 cd ../tinycbor
-git checkout master
+git checkout main
 git pull
 make
 cd ../hiredis

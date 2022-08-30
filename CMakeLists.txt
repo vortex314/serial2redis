@@ -37,7 +37,7 @@ target_sources(serial2redis PRIVATE
     ${LIMERO}/linux/Redis.cpp
     src/Framing.cpp
     ${LIMERO}/src/PPP.cpp
-    ${LIMERO}/src/CborDump.cpp
+    ${LIMERO}/linux/CborDump.cpp
     ${LIMERO}/src/CborSerializer.cpp
     ${LIMERO}/src/CborDeserializer.cpp
     ${LIMERO}/linux/Log.cpp
