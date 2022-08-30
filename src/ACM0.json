@@ -12,7 +12,7 @@
         ]
     },
     "serial": {
-        "port": "/dev/ttyUSB0",
+        "port": "/dev/ttyACM0",
         "baudrate": 921600,
         "frame": "ppp",
         "format": "cbor"
