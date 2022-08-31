@@ -201,8 +201,6 @@ int main(int argc, char **argv) {
     exit(-1);
   }
 
-  printf("%s%s%s\n", ColorOrange, "Orange", ColorDefault);
-
   workerThread.run();
 }
 
