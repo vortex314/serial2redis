@@ -12,7 +12,7 @@
         ]
     },
     "serial": {
-        "port": "/dev/ttyACM0",
+        "port": "/dev/ttyUSB0",
         "baudrate": 115200,
         "frame": "ppp",
         "format": "cbor"
@@ -20,8 +20,8 @@
     "proxy": {
         "timeout": 5000
     },
-    "log-ignore": {
-        "prefix": "/home/lieven/log/serial2redis_",
+    "log": {
+        "prefix": "/home/lieven/log/USB0_",
         "count": 10,
         "limit": 1048576
     }
