@@ -1,6 +1,7 @@
 
 #include <ArduinoJson.h>
 #include <ConfigFile.h>
+#include <Flows.h>
 #include <Fnv.h>
 #include <Frame.h>
 #include <Log.h>
@@ -25,24 +26,24 @@ void deepMerge(JsonVariant dst, JsonVariant src);
 
 //================================================================
 class RedisProxy : public Actor {
-  ValueFlow<std::string> _toRedis;
-  ValueFlow<std::string> _fromRedis;
+  ValueFlow<Bytes> _toRedis;
+  ValueFlow<Bytes> _fromRedis;
   bool _connected;
   Redis _redis;
   uint64_t _lastMessage;
-  LambdaFlow<std::string, Json> *_stringToJson;
-  LambdaFlow<Json, std::string> *_jsonToString;
+  LambdaFlow<Bytes, Json> *_stringToJson;
+  LambdaFlow<Json, Bytes> *_jsonToString;
 
  public:
-  RedisProxy(Thread &thread, JsonObject config);
+  RedisProxy(Thread &thread, Json &config);
   ~RedisProxy();
 
   int connect();
   void stop();
   void disconnect();
 
-  Sink<std::string> &toRedis();
-  Source<std::string> &fromRedis();
+  Sink<Bytes> &toRedis();
+  Source<Bytes> &fromRedis();
   uint64_t inactivity();
 };
 
@@ -54,8 +55,8 @@ int main(int argc, char **argv) {
   config["redis"]["host"] = "localhost";
   config["redis"]["port"] = 6379;
   config["proxy"]["timeout"] = 5000;
-  INFO("Loading configuration.");
-  configurator(config,argc, argv);
+
+  configurator(config, argc, argv);
   std::string s;
   serializeJson(config, s);
   INFO("config:%s", s.c_str());
@@ -72,22 +73,20 @@ int main(int argc, char **argv) {
   udpServer.connect();
 
   udpServer.recv() >> [&](const UdpMsg &udpMsg) {
-    std::string payload =
-        std::string(udpMsg.message.begin(), udpMsg.message.end());
+    Bytes payload = udpMsg.payload;
     DEBUG("UDP RXD %s => %s : %s", udpMsg.src.toString().c_str(),
-          udpMsg.dst.toString().c_str(), payload.c_str());
+          udpMsg.dst.toString().c_str(), hexDump(payload).c_str());
 
     UdpAddress udpSource = udpMsg.src;
     RedisProxy *redisProxy;
 
     auto it = clients.find(udpSource);
     if (it == clients.end()) {
-      redisProxy = new RedisProxy(workerThread, brokerConfig);
-      redisProxy->fromRedis() >> [&, udpSource](const std::string &bs) {
-        UdpMsg msg{serverAddress, udpSource,
-                   std::vector<uint8_t>(bs.data(), bs.data() + bs.size())};
-        DEBUG("UDP TXD %s => %s : %s ", msg.src.toString().c_str(),
-              msg.dst.toString().c_str(), bs.c_str());
+      redisProxy = new RedisProxy(workerThread, config);
+      redisProxy->fromRedis() >> [&, udpSource](const Bytes &bs) {
+        UdpMsg msg{serverAddress, udpSource, bs};
+        INFO("UDP TXD %s => %s : %s ", msg.src.toString().c_str(),
+             msg.dst.toString().c_str(), hexDump(msg.payload).c_str());
         udpServer.send().on(msg);
       };
       auto res = clients.insert({udpSource, redisProxy});
@@ -123,28 +122,23 @@ int main(int argc, char **argv) {
   workerThread.run();
 }
 
-RedisProxy::RedisProxy(Thread &thread, JsonObject config)
-    : Actor(thread), _redis(thread, config) {
-  _stringToJson =
-      new LambdaFlow<std::string, Json>([&](Json &docIn, const std::string &s) {
-        if (s.c_str() == nullptr) return false;
-        docIn.clear();
-        auto rc = deserializeJson(docIn, s);
-        if (rc != DeserializationError::Ok) {
-          WARN("NO JSON : %s%s%s", ColorOrange, s.c_str(), ColorDefault);
-        }
-        return rc == DeserializationError::Ok;
-      });
-  _jsonToString = new LambdaFlow<Json, std::string>(
-      [&](std::string &msg, const Json &docIn) {
-        size_t sz = serializeJson(docIn, msg);
-        return true;
-      });
-
-  _redis.response() >> _jsonToString >> _fromRedis;
-  _toRedis >> _stringToJson >> _redis.request();
-  _toRedis >> [&](const std::string &s) { _lastMessage = Sys::millis(); };
-};
+RedisProxy::RedisProxy(Thread &thread, Json &config)
+    : Actor(thread), _redis(thread, config["redis"].as<JsonObject>()) {
+  std::string format = config["udp"]["format"] | "json";
+  if (format == " json") {
+    _redis.response() >> responseToString() >> stringToBytes() >> _fromRedis;
+    _toRedis >> bytesToString() >> stringToRequest() >> _redis.request();
+    _toRedis >> [&](const Bytes &s) { _lastMessage = Sys::millis(); };
+  } else if (format == "cbor") {
+    _redis.response() >> responseToCbor() >> _fromRedis;
+    _toRedis >> cborToRequest() >> _redis.request();
+    _toRedis >> [&](const Bytes &s) { _lastMessage = Sys::millis(); };
+  } else {
+    _redis.response() >> responseToBytes() >> _fromRedis;
+    _toRedis >> bytesToRequest() >> _redis.request();
+    _toRedis >> [&](const Bytes &s) { _lastMessage = Sys::millis(); };
+  }
+}
 
 RedisProxy::~RedisProxy() {
   INFO("dtor RedisProxy")
@@ -155,6 +149,6 @@ RedisProxy::~RedisProxy() {
 int RedisProxy::connect() { return _redis.connect(); }
 void RedisProxy::stop() { _redis.stop(); }
 void RedisProxy::disconnect() { _redis.disconnect(); }
-Sink<std::string> &RedisProxy::toRedis() { return _toRedis; }
-Source<std::string> &RedisProxy::fromRedis() { return _fromRedis; }
+Sink<Bytes> &RedisProxy::toRedis() { return _toRedis; }
+Source<Bytes> &RedisProxy::fromRedis() { return _fromRedis; }
 uint64_t RedisProxy::inactivity() { return Sys::millis() - _lastMessage; }

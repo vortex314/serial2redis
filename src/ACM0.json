@@ -1,6 +1,6 @@
 {
     "redis": {
-        "host": "localhost",
+        "host": "limero.local",
         "port": 6379,
         "addReplyContext": true,
         "reconnectOnConnectionLoss": true,
@@ -20,7 +20,7 @@
     "proxy": {
         "timeout": 5000
     },
-    "log": {
+    "log-ignore": {
         "prefix": "/home/lieven/log/ACM0_",
         "count": 10,
         "limit": 1048576

@@ -11,7 +11,7 @@ SessionUdp::SessionUdp(Thread &thread, UdpAddress address)
 UdpAddress SessionUdp::address() { return _udp.address(); }
 
 bool SessionUdp::connect() {
-  if( _udp.init() ) return false;
+  if (_udp.init()) return false;
   thread().addReadInvoker(_udp.fd(), this,
                           [](void *pv) { ((SessionUdp *)pv)->invoke(); });
   thread().addErrorInvoker(_udp.fd(), this,
@@ -29,7 +29,7 @@ void SessionUdp::invoke() {
   int rc = _udp.receive(_udpMsg);
   if (rc == 0) {  // read ok
     DEBUG("UDP RXD %s => %s ", _udpMsg.src.toString().c_str(),
-          hexDump(_udpMsg.message).c_str());
+          hexDump(_udpMsg.payload).c_str());
     _recv.on(_udpMsg);
   }
 }

@@ -36,6 +36,7 @@ target_sources(serial2redis PRIVATE
     src/serial.cpp 
     ${LIMERO}/linux/Redis.cpp
     src/Framing.cpp
+    src/Flows.cpp
     ${LIMERO}/src/PPP.cpp
     ${LIMERO}/linux/CborDump.cpp
     ${LIMERO}/src/CborSerializer.cpp
@@ -50,6 +51,10 @@ target_sources(serial2redis PRIVATE
 
 target_sources(ws2redis PRIVATE 
     src/ws2redis.cpp 
+    src/Flows.cpp
+    ${LIMERO}/linux/CborDump.cpp
+    ${LIMERO}/src/CborSerializer.cpp
+    ${LIMERO}/src/CborDeserializer.cpp
     ${LIMERO}/linux/ConfigFile.cpp 
     ${LIMERO}/linux/Redis.cpp
     ${LIMERO}/linux/Log.cpp
@@ -62,10 +67,14 @@ target_sources(ws2redis PRIVATE
 
 target_sources(udp2redis PRIVATE 
     src/udp2redis.cpp 
+    src/Flows.cpp
     ${LIMERO}/linux/Redis.cpp
     ${LIMERO}/linux/ConfigFile.cpp 
     src/SessionUdp.cpp
     src/Udp.cpp 
+    ${LIMERO}/linux/CborDump.cpp
+    ${LIMERO}/src/CborSerializer.cpp
+    ${LIMERO}/src/CborDeserializer.cpp
     ${LIMERO}/linux/Log.cpp
     ${LIMERO}/linux/LogFile.cpp
     ${LIMERO}/linux/Sys.cpp
@@ -87,11 +96,13 @@ target_link_libraries(ws2redis
     -L../${SEASOCKS_LDIR} -l:libseasocks.a
     -lz
     -L../${HIREDIS} -l:libhiredis.a
+    -L../${TINYCBOR}/lib -l:libtinycbor.a
     -lrt  
     -latomic)
 
 target_link_libraries(udp2redis 
     -lpthread  
     -L../${HIREDIS} -l:libhiredis.a
+    -L../${TINYCBOR}/lib -l:libtinycbor.a
     -lrt  
     -latomic)

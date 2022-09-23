@@ -1,7 +1,7 @@
 
-#include <Udp.h>
 #include <Log.h>
 #include <StringUtility.h>
+#include <Udp.h>
 
 Udp::Udp(UdpAddress addr) : _addr(addr) {}
 
@@ -46,13 +46,13 @@ int Udp::receive(UdpMsg &rxd) {
                     (struct sockaddr *)&clientaddr, &len);
 
   if (rc >= 0) {
-    rxd.message.clear();
+    rxd.payload.clear();
     rxd.src.ip = clientaddr.sin_addr.s_addr;
     rxd.src.port = ntohs(clientaddr.sin_port);
     rxd.dst = _addr;
     INFO(" received from %s to %s  ", rxd.src.toString().c_str(),
          rxd.dst.toString().c_str());
-    rxd.message = Bytes(buffer, buffer + rc);
+    rxd.payload = Bytes(buffer, buffer + rc);
     return 0;
   } else {
     return errno;
@@ -71,7 +71,7 @@ int Udp::send(const UdpMsg &udpMsg) {
   /* INFO("TXD UDP => %s : %s ", udpMsg.dst.toString().c_str(),
         hexDump(udpMsg.message).c_str());*/
 
-  int rc = sendto(_sockfd, udpMsg.message.data(), udpMsg.message.size(), 0,
+  int rc = sendto(_sockfd, udpMsg.payload.data(), udpMsg.payload.size(), 0,
                   (const struct sockaddr *)&dest, sizeof(dest));
   if (rc < 0) return errno;
   return 0;
@@ -123,14 +123,14 @@ bool getNetPort(uint16_t &x, const std::string &s) {
       return false;
     }
   }
-//  INFO("getNetPort(%s)=%d",s.c_str(),x);
-//  x = htons(x);
+  //  INFO("getNetPort(%s)=%d",s.c_str(),x);
+  //  x = htons(x);
   return true;
 }
 
-UdpAddress::UdpAddress(std::string _ip,uint16_t _port) {
+UdpAddress::UdpAddress(std::string _ip, uint16_t _port) {
   port = _port;
-  getInetAddr(ip,_ip);
+  getInetAddr(ip, _ip);
 }
 
 std::string UdpAddress::toString() const {

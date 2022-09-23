@@ -1,11 +1,15 @@
 {
     "redis": {
         "host": "localhost",
-        "port": 6379
+        "port": 6379,
+        "initCommands": [
+            "hello 3"
+        ]
     },
     "udp": {
         "net": "0.0.0.0",
-        "port": 9001
+        "port": 9001,
+        "format": "cbor"
     },
     "serial": {
         "port": "/dev/ttyUSB0",
@@ -24,7 +28,7 @@
             "PUBLISH src/redis/proxy $config"
         ]
     },
-    "log": {
+    "log-ignore": {
         "prefix": "/home/lieven/log/udp2redis_",
         "count": 10,
         "limit": 1048576

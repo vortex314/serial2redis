@@ -45,7 +45,7 @@ struct UdpMsg {
  public:
   UdpAddress src;
   UdpAddress dst;
-  Bytes message;
+  Bytes payload;
   void dstIpString(const char *ip) { dst.ip = inet_addr(ip); }
   void dstPort(uint16_t port) { dst.port = htons(port); }
 };
