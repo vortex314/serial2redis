@@ -1,12 +1,12 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
+
 #include <cstdarg>
 
-const char *helloCmd[] = {"HELLO", "3"};
-const char *subscribeCmd[] = {"PSUBSCRIBE", "_"};
-const char *publishCmd[] = {"PUBLISH", "_", "_"};
+const char *subscribeCmd[] = {"SUB", "_"};
+const char *publishCmd[] = {"PUB", "_", "_"};
 
-#define UART Serial1
+#define UART Serial
 
 #define LINE()          \
   UART.print(__LINE__); \
@@ -58,7 +58,37 @@ void serialEvent1()
 void setup()
 {
   pinMode(LED_BUILTIN, OUTPUT);
-  UART.begin(921600);
+  UART.begin(115200);
+}
+
+uint32_t crc32(uint32_t crc, uint32_t data)
+{
+  int i;
+  crc = crc ^ data;
+  for(i=0; i<32; i++)
+    if (crc & 0x80000000)
+      crc = (crc << 1) ^ 0x04C11DB7; // Polynomial used in STM32
+    else
+      crc = (crc << 1);
+  return(crc);
+}
+
+String crc(String s){
+  uint32_t crc = 0xFFFFFFFF;
+  for( uint32_t i=0;i<s.length();i++) crc=crc32(crc,s[i]);
+  String out = String(crc,16);
+  while(out.length()<8) out = "0"+out;
+  return out;
+}
+
+
+void send_json(DynamicJsonDocument &doc)
+{
+  String s;
+  serializeJson(doc, s);
+  UART.print(s);
+  UART.print(crc(s));
+  UART.println();
 }
 
 void publish(const char *key, uint32_t value)
@@ -67,16 +97,7 @@ void publish(const char *key, uint32_t value)
   copyArray(publishCmd, doc);
   doc[1] = key;
   doc[2] = String(value, 10);
-  serializeJson(doc, UART);
-  UART.println();
-}
-
-void hello()
-{
-  doc.clear();
-  copyArray(helloCmd, doc);
-  serializeJson(doc, UART);
-  UART.println();
+  send_json(doc);
 }
 
 void subscribe(const char *pattern)
@@ -84,27 +105,26 @@ void subscribe(const char *pattern)
   doc.clear();
   copyArray(subscribeCmd, doc);
   doc[1] = pattern;
-  serializeJson(doc, UART);
-  UART.println();
+  send_json(doc);
 }
 
-uint64_t nextSub=0;
-uint64_t nextPub=0;
+uint64_t nextSub = 0;
+uint64_t nextPub = 0;
 
 void loop()
 {
-  if (millis()> nextSub )
+  if (millis() > nextSub)
   {
-    hello();
     digitalWrite(LED_BUILTIN, HIGH);
     delay(10);
     subscribe("dst/maple/*");
     digitalWrite(LED_BUILTIN, LOW);
     delay(10);
-    nextSub = millis()+1000;
+    nextSub = millis() + 1000;
   }
-  if (millis() > nextPub ) {
+  if (millis() > nextPub)
+  {
     publish("dst/maple/sys/loopback", millis());
-    nextPub = millis()+100;
+    nextPub = millis() + 100;
   }
 }

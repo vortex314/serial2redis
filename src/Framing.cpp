@@ -14,7 +14,8 @@ class Deframer : public Flow<Bytes, Bytes> {
   }
   void on(const Bytes& in) {
     for (auto c : in) {
-      if (std::find(_delimiter.begin(), _delimiter.end(), (char)c) != _delimiter.end()) {
+      if (std::find(_delimiter.begin(), _delimiter.end(), (char)c) !=
+          _delimiter.end()) {
         if (_buffer.size() > 0) {
           emit(_buffer);
           _buffer.clear();
@@ -31,7 +32,7 @@ Framing::Framing(const char* delimiter, size_t maxFrameLength) {
   _maxFrameLength = maxFrameLength;
   _delimiter = delimiter;
 
-  _frame = * new LambdaFlow<Bytes, Bytes>([&](Bytes& out, const Bytes& in) {
+  _frame = *new Flow<Bytes, Bytes>([&](Bytes& out, const Bytes& in) {
     //    for (auto c : _delimiter) out.push_back(c);
     out.insert(out.end(), in.begin(), in.end());
     for (auto c : _delimiter) out.push_back(c);
@@ -41,8 +42,6 @@ Framing::Framing(const char* delimiter, size_t maxFrameLength) {
   _deframe = new Deframer(delimiter, maxFrameLength);
 }
 
-Framing::~Framing(){
-  delete _deframe;
-}
+Framing::~Framing() { delete _deframe; }
 Flow<Bytes, Bytes>& Framing::deframe() { return *_deframe; }
 Flow<Bytes, Bytes>& Framing::frame() { return _frame; }

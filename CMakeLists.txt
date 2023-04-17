@@ -6,15 +6,17 @@ add_executable(udp2redis)
 add_executable(ws2redis)
 
 set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_C_COMPILER gcc) 
+set(CMAKE_CXX_COMPILER g++) 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g ")
 set(CMAKE_C_FLAGS "${CMAKE_CXX_FLAGS} -g ")
 add_definitions(-DLINUX -std=c++17) # needed 17 for seasocks
 
 set(HIREDIS hiredis )
-set(LIMERO limero)
+set(LIMERO /home/lieven/workspace/limero)
 
 set(TINYCBOR tinycbor)
-set(ARDUINOJSON ArduinoJson/src)
+set(ARDUINOJSON /home/lieven/workspace/ArduinoJson/src)
 set(SEASOCKS seasocks)
 set(SEASOCKS_LDIR ${SEASOCKS}/build/src/main/c)
 set(SEASOCKS_INC ${SEASOCKS}/src/main/c)

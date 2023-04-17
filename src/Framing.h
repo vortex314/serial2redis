@@ -4,7 +4,7 @@
 class Framing {
   size_t _maxFrameLength;
   std::string _delimiter;
-  LambdaFlow<Bytes, Bytes> _frame;
+  Flow<Bytes, Bytes> _frame;
   Flow<Bytes, Bytes>* _deframe;
 
  public:

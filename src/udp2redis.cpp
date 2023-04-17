@@ -31,8 +31,8 @@ class RedisProxy : public Actor {
   bool _connected;
   Redis _redis;
   uint64_t _lastMessage;
-  LambdaFlow<Bytes, Json> *_stringToJson;
-  LambdaFlow<Json, Bytes> *_jsonToString;
+  // Flow<Bytes, Json> _stringToJson;
+  // Flow<Json, Bytes> _jsonToString;
 
  public:
   RedisProxy(Thread &thread, Json &config);
@@ -100,8 +100,8 @@ int main(int argc, char **argv) {
 
   // cleanup inactive clients
 
-  TimerSource ts(workerThread, 3000, true);
-  ts >> [&](const TimerMsg &) {
+  auto &ts = workerThread.createTimer(3000, true);
+  ts >> [&](const Timer &) {
     INFO(" active clients : %d ", clients.size());
     auto itr = clients.begin();
     while (itr != clients.end()) {
@@ -123,27 +123,29 @@ int main(int argc, char **argv) {
 }
 
 RedisProxy::RedisProxy(Thread &thread, Json &config)
-    : Actor(thread), _redis(thread, config["redis"].as<JsonObject>()) {
+    : Actor(thread), _redis(thread, config["redis"].as<JsonObject>()), _lastMessage(0),_toRedis(thread), _fromRedis(thread){
   std::string format = config["udp"]["format"] | "json";
   if (format == " json") {
-    _redis.response() >> responseToString() >> stringToBytes() >> _fromRedis;
-    _toRedis >> bytesToString() >> stringToRequest() >> _redis.request();
-    _toRedis >> [&](const Bytes &s) { _lastMessage = Sys::millis(); };
+    _redis.response() >> *responseToString() >> *stringToBytes() >> _fromRedis;
+    _toRedis >> *bytesToString() >> *stringToRequest() >> _redis.request();
+    _toRedis >>
+        *new Sink<Bytes>([&](const Bytes &s) { _lastMessage = Sys::millis(); });
   } else if (format == "cbor") {
-    _redis.response() >> responseToCbor() >> _fromRedis;
-    _toRedis >> cborToRequest() >> _redis.request();
+    _redis.response() >> *responseToCbor() >> _fromRedis;
+    _toRedis >> *cborToRequest() >> _redis.request();
     _toRedis >> [&](const Bytes &s) { _lastMessage = Sys::millis(); };
   } else {
-    _redis.response() >> responseToBytes() >> _fromRedis;
-    _toRedis >> bytesToRequest() >> _redis.request();
-    _toRedis >> [&](const Bytes &s) { _lastMessage = Sys::millis(); };
+    _redis.response() >> *responseToBytes() >> _fromRedis;
+    _toRedis >> *bytesToRequest() >> _redis.request();
+    _toRedis >>
+        *new Sink<Bytes>([&](const Bytes &s) { _lastMessage = Sys::millis(); });
   }
 }
 
 RedisProxy::~RedisProxy() {
   INFO("dtor RedisProxy")
-  delete _stringToJson;
-  delete _jsonToString;
+  //  delete _stringToJson;
+  //  delete _jsonToString;
 }
 
 int RedisProxy::connect() { return _redis.connect(); }

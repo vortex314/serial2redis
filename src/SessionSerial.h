@@ -17,7 +17,7 @@ class SessionSerial : public Actor {
   Bytes _cleanData;
   uint64_t _lastFrameFlag;
   uint64_t _frameTimeout = 2000;
-  ValueFlow<Bytes> _incomingFrame;
+  QueueFlow<Bytes> _incomingFrame;
   ValueFlow<Bytes> _outgoingFrame;
   ValueFlow<bool> _connected;
 

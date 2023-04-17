@@ -2,7 +2,10 @@
 #include <StringUtility.h>
 
 SessionSerial::SessionSerial(Thread &thread, JsonObject config)
-    : Actor(thread) {
+    : Actor(thread),
+      _incomingFrame(thread, 10),
+      _outgoingFrame(thread),
+      _connected(thread) {
   _port = config["port"] | "/dev/ttyUSB0";
   _baudrate = config["baudrate"] | 115200;
 }
@@ -11,11 +14,11 @@ bool SessionSerial::init() {
   _serialPort.port(_port);
   _serialPort.baudrate(_baudrate);
   _serialPort.init();
-  _outgoingFrame >> [&](const Bytes &data) {
-    // INFO("TXD  %s => [%d] %s", _serialPort.port().c_str(),data.size(),
-    //    hexDump(data).c_str());
+  _outgoingFrame.handler([&](const Bytes &data) {
+    INFO("TXD  %s => [%d] %s", _serialPort.port().c_str(), data.size(),
+         hexDump(data).c_str());
     _serialPort.txd(data);
-  };
+  });
   return true;
 }
 
@@ -41,6 +44,9 @@ void SessionSerial::onRead() {
       WARN(" 0 data => connection lost ");
       reconnect();
     } else {
+      INFO("RXD  %s => [%d] %s : %s ", _serialPort.port().c_str(),
+           _rxdBuffer.size(), hexDump(_rxdBuffer).c_str(),
+           charDump(_rxdBuffer).c_str());
       _incomingFrame.on(_rxdBuffer);
     }
   }

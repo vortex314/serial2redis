@@ -164,8 +164,8 @@ int main(int argc, char** argv) {
   std::string webInterface = config["web"]["interface"];
   Redis* redis = new Redis(workerThread, config["redis"]);
   redis->connect();
-  TimerSource* pinger = new TimerSource(workerThread, 1000, true, "pinger");
-  *pinger >> [&](const TimerMsg&) {
+  Timer& pinger = workerThread.createTimer(1000, true, true, "pinger");
+  pinger >> [&](const Timer&) {
     std::string systemAliveTopic = "src/ws2redis/system/alive";
     Json systemAlive;
     systemAlive[0] = "publish";

@@ -2,9 +2,9 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "MAKE",
+            "label": "Ninja",
             "type": "shell",
-            "command": "make",
+            "command": "ninja",
             "args": [
                 ""
             ],

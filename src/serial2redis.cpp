@@ -46,44 +46,46 @@ int main(int argc, char **argv) {
   serial.init();
   serial.connect();
   string port = config["serial"]["port"];
-  TimerSource *pinger = new TimerSource(workerThread, 1000, true, "pinger");
-  *pinger >> [&](const TimerMsg &) {
-    std::string shortPort = port.substr(strlen("/dev/tty"));
-    std::string systemAliveTopic = "src/";
-    systemAliveTopic += shortPort + "/system/alive";
-    Json systemAlive;
-    systemAlive[0] = "publish";
-    systemAlive[1] = systemAliveTopic;
-    systemAlive[2] = "true";
-    redis.request().on(systemAlive);
-  };
+
+  Timer &timer = workerThread.createTimer(1000, true);
+  auto publishAlive =
+      new Flow<Timer, Json>([&](Json &systemAlive, const Timer &) {
+        INFO("Publishing system alive");
+        std::string shortPort = port.substr(strlen("/dev/tty"));
+        std::string systemAliveTopic = "src/";
+        systemAliveTopic += shortPort + "/system/alive";
+        systemAlive[0] = "publish";
+        systemAlive[1] = systemAliveTopic;
+        systemAlive[2] = "true";
+        return true;
+      });
+
+  timer >> *publishAlive >> redis.request();  // send alive every second
 
   Framing crlf("\r\n", 10000);
   PPP ppp(workerThread, 1024);
   std::string format = config["serial"]["format"] | "json";
   std::string framing = config["serial"]["frame"] | "crlf";
+  Sink<Bytes> logBytes([](const Bytes &bs) {
+    INFO("RXD[%d] : %s%s%s", bs.size(), ColorOrange, charDump(bs).c_str(),
+         ColorDefault);
+  });
 
   if (framing == "crlf") {
-    serial.incoming() >> crlf.deframe() >> bytesToRequest() >> redis.request();
-    redis.response() >> responseToBytes() >> crlf.frame() >> serial.outgoing();
+    serial.incoming() >> crlf.deframe() >> *bytesToRequest() >> redis.request();
+    redis.response() >> *responseToBytes() >> crlf.frame() >> serial.outgoing();
 
   } else if (framing == "ppp" && format == "json") {
-    serial.incoming() >> ppp.deframe() >> bytesToRequest() >> redis.request();
-    redis.response() >> responseToBytes() >> ppp.frame() >> serial.outgoing();
+    serial.incoming() >> ppp.deframe() >> *bytesToRequest() >> redis.request();
+    redis.response() >> *responseToBytes() >> ppp.frame() >> serial.outgoing();
 
-    ppp.garbage() >> [&](const Bytes &bs) {
-      INFO("RXD[%d] : %s%s%s", bs.size(), ColorOrange, charDump(bs).c_str(),
-           ColorDefault);
-    };
+    ppp.garbage() >> logBytes;
 
   } else if (framing == "ppp" && format == "cbor") {
-    serial.incoming() >> ppp.deframe() >> cborToRequest() >> redis.request();
-    redis.response() >> responseToCbor() >> ppp.frame() >> serial.outgoing();
+    serial.incoming() >> ppp.deframe() >> *cborToRequest() >> redis.request();
+    redis.response() >> *responseToCbor() >> ppp.frame() >> serial.outgoing();
 
-    ppp.garbage() >> [&](const Bytes &bs) {
-      INFO("RXD[%d] : %s%s%s", bs.size(), ColorOrange, charDump(bs).c_str(),
-           ColorDefault);
-    };
+    ppp.garbage() >> logBytes;
 
   } else {
     WARN("unknown framing : %s ", framing.c_str());
