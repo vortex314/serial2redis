@@ -50,7 +50,7 @@ int main(int argc, char **argv) {
   Timer &timer = workerThread.createTimer(1000, true);
   auto publishAlive =
       new Flow<Timer, Json>([&](Json &systemAlive, const Timer &) {
-        INFO("Publishing system alive");
+        DEBUG("Publishing system alive");
         std::string shortPort = port.substr(strlen("/dev/tty"));
         std::string systemAliveTopic = "src/";
         systemAliveTopic += shortPort + "/system/alive";
@@ -71,9 +71,11 @@ int main(int argc, char **argv) {
          ColorDefault);
   });
 
-  if (framing == "crlf") {
-    serial.incoming() >> crlf.deframe() >> *bytesToRequest() >> redis.request();
-    redis.response() >> *responseToBytes() >> crlf.frame() >> serial.outgoing();
+  if (framing == "crlf" && format == "json") {
+    serial.incoming() >> crlf.deframe() >> *crlfCrcToRequest() >>
+        redis.request();
+    redis.response() >> *responseToCrlfCrc() >> crlf.frame() >>
+        serial.outgoing();
 
   } else if (framing == "ppp" && format == "json") {
     serial.incoming() >> ppp.deframe() >> *bytesToRequest() >> redis.request();

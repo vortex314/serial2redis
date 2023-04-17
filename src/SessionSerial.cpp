@@ -41,10 +41,10 @@ void SessionSerial::onRead() {
   int rc = _serialPort.rxd(_rxdBuffer);
   if (rc == 0) {                   // read ok
     if (_rxdBuffer.size() == 0) {  // but no data
-      WARN(" 0 data => connection lost ");
+      WARN(" 0 data => connection lost [%d] %s",errno,strerror(errno));
       reconnect();
     } else {
-      INFO("RXD  %s => [%d] %s : %s ", _serialPort.port().c_str(),
+      DEBUG("RXD  %s => [%d] %s : %s ", _serialPort.port().c_str(),
            _rxdBuffer.size(), hexDump(_rxdBuffer).c_str(),
            charDump(_rxdBuffer).c_str());
       _incomingFrame.on(_rxdBuffer);

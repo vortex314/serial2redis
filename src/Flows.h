@@ -19,10 +19,16 @@ Json cborToJson(const Bytes &);
 
 Flow<Bytes, Json> *cborToRequest();
 Flow<Json, Bytes> *responseToCbor();
+
+Flow<Bytes, Json> *crlfCrcToRequest();
+Flow<Json, Bytes> *responseToCrlfCrc();
+
 Flow<Bytes, Json> *bytesToRequest();
 Flow<Json, Bytes> *responseToBytes();
+
 Flow<std::string, Json> *stringToRequest();
 Flow<Json, std::string> *responseToString();
+
 Flow<Bytes,std::string> *bytesToString();
 Flow<std::string,Bytes> *stringToBytes();
 

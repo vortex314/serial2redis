@@ -14,8 +14,8 @@
     "serial": {
         "port": "/dev/ttyUSB0",
         "baudrate": 115200,
-        "frame": "ppp",
-        "format": "cbor"
+        "frame": "crlf",
+        "format": "json"
     },
     "proxy": {
         "timeout": 5000
