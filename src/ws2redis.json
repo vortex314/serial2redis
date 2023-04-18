@@ -1,12 +1,12 @@
 {
 	"web": {
 		"dir": "/home/lieven/workspace/redisDashboard/dist",
-		"port": 9000,
+		"port": 6502,
 		"interface": "0.0.0.0",
 		"socket": "/redis"
 	},
 	"redis": {
-		"host": "127.0.0.1",
+		"host": "pcthink.local",
 		"port": 6379
 	},
 	"log-ignore": {

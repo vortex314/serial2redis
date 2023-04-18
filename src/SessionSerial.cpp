@@ -4,7 +4,7 @@
 SessionSerial::SessionSerial(Thread &thread, JsonObject config)
     : Actor(thread),
       _incomingFrame(thread, 10),
-      _outgoingFrame(thread),
+      _outgoingFrame(thread,10),
       _connected(thread) {
   _port = config["port"] | "/dev/ttyUSB0";
   _baudrate = config["baudrate"] | 115200;
@@ -14,11 +14,11 @@ bool SessionSerial::init() {
   _serialPort.port(_port);
   _serialPort.baudrate(_baudrate);
   _serialPort.init();
-  _outgoingFrame.handler([&](const Bytes &data) {
-    INFO("TXD  %s => [%d] %s", _serialPort.port().c_str(), data.size(),
+  _outgoingFrame>> [&](const Bytes &data) {
+    DEBUG("TXD  %s => [%d] %s", _serialPort.port().c_str(), data.size(),
          hexDump(data).c_str());
     _serialPort.txd(data);
-  });
+  };
   return true;
 }
 

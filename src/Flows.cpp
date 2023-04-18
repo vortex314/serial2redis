@@ -220,8 +220,9 @@ Flow<Bytes, Json> *crlfCrcToRequest() {
     String payload = line.substr(0, line.size() - 4);
     String crc2 = crc16(payload);
     if (crc != crc2) {
-      WARN("CRC MISMATCH %s != %s for %s ", crc.c_str(), crc2.c_str(),
-           line.c_str());
+      INFO(" LOG : %s%s%s", ColorOrange, line.c_str(), ColorDefault);
+      DEBUG("CRC MISMATCH %s != %s for %s ", crc.c_str(), crc2.c_str(),
+            line.c_str());
       return false;
     }
     request.clear();
