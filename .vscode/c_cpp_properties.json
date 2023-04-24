@@ -3,9 +3,9 @@
         {
             "name": "ESP32",
             "includePath": [
-                "${workspaceFolder}/limero/inc/",
-                "${workspaceFolder}/limero/linux/",
-                "${workspaceFolder}/ArduinoJson/src",
+                "${workspaceFolder}/../limero/inc/",
+                "${workspaceFolder}/../limero/linux/",
+                "${workspaceFolder}/../ArduinoJson/src",
                 "${workspaceFolder}/hiredis",
                 "${workspaceFolder}/tinycbor/src",
                 "${workspaceFolder}/src",

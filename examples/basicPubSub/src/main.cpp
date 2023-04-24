@@ -141,6 +141,6 @@ void loop()
   if (millis() > nextPub)
   {
     serialPubSub.publish("dst/arduino/sys/loopback", millis());
-    nextPub = millis() + 10;
+    nextPub = millis() + 100;
   }
 }

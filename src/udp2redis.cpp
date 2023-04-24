@@ -101,7 +101,7 @@ int main(int argc, char **argv) {
   // cleanup inactive clients
 
   auto &ts = workerThread.createTimer(3000, true);
-  ts >> [&](const Timer &) {
+  ts >> [&](const TimerSource &) {
     INFO(" active clients : %d ", clients.size());
     auto itr = clients.begin();
     while (itr != clients.end()) {
@@ -123,13 +123,17 @@ int main(int argc, char **argv) {
 }
 
 RedisProxy::RedisProxy(Thread &thread, Json &config)
-    : Actor(thread), _redis(thread, config["redis"].as<JsonObject>()), _lastMessage(0),_toRedis(thread), _fromRedis(thread){
+    : Actor(thread),
+      _redis(thread, config["redis"].as<JsonObject>()),
+      _lastMessage(0),
+      _toRedis(thread),
+      _fromRedis(thread) {
   std::string format = config["udp"]["format"] | "json";
   if (format == " json") {
     _redis.response() >> *responseToString() >> *stringToBytes() >> _fromRedis;
     _toRedis >> *bytesToString() >> *stringToRequest() >> _redis.request();
-    _toRedis >>
-        *new Sink<Bytes>([&](const Bytes &s) { _lastMessage = Sys::millis(); });
+    _toRedis >> *new SinkFunction<Bytes>(
+                    [&](const Bytes &s) { _lastMessage = Sys::millis(); });
   } else if (format == "cbor") {
     _redis.response() >> *responseToCbor() >> _fromRedis;
     _toRedis >> *cborToRequest() >> _redis.request();
@@ -137,8 +141,8 @@ RedisProxy::RedisProxy(Thread &thread, Json &config)
   } else {
     _redis.response() >> *responseToBytes() >> _fromRedis;
     _toRedis >> *bytesToRequest() >> _redis.request();
-    _toRedis >>
-        *new Sink<Bytes>([&](const Bytes &s) { _lastMessage = Sys::millis(); });
+    _toRedis >> *new SinkFunction<Bytes>(
+                    [&](const Bytes &s) { _lastMessage = Sys::millis(); });
   }
 }
 

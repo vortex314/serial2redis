@@ -47,9 +47,9 @@ int main(int argc, char **argv) {
   serial.connect();
   string port = config["serial"]["port"];
 
-  Timer &timer = workerThread.createTimer(1000, true);
+  TimerSource &timer = workerThread.createTimer(1000, true);
   auto publishAlive =
-      new Flow<Timer, Json>([&](Json &systemAlive, const Timer &) {
+      new Flow<TimerSource, Json>([&](Json &systemAlive, const TimerSource &) {
         DEBUG("Publishing system alive");
         std::string shortPort = port.substr(strlen("/dev/tty"));
         std::string systemAliveTopic = "src/";
@@ -66,7 +66,7 @@ int main(int argc, char **argv) {
   PPP ppp(workerThread, 1024);
   std::string format = config["serial"]["format"] | "json";
   std::string framing = config["serial"]["frame"] | "crlf";
-  Sink<Bytes> logBytes([](const Bytes &bs) {
+  SinkFunction<Bytes> logBytes([](const Bytes &bs) {
     INFO("RXD[%d] : %s%s%s", bs.size(), ColorOrange, charDump(bs).c_str(),
          ColorDefault);
   });
