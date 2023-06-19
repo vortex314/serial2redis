@@ -20,7 +20,7 @@ class SessionUdp : public Actor {
   ValueFlow<String> _logs;
 
   ValueFlow<UdpMsg> _recv;
-  ValueFlow<UdpMsg> _send;
+  QueueFlow<UdpMsg> _send;
 
   ValueFlow<bool> _connected;
   UdpMsg _udpMsg;

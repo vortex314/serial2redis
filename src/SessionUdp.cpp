@@ -2,12 +2,19 @@
 #include <StringUtility.h>
 
 SessionUdp::SessionUdp(Thread &thread, UdpAddress address)
-    : Actor(thread), _udp(address), _connected(thread), _logs(thread),
-     _recv(thread), _send(thread), _incomingMessage(thread), 
-     _outgoingMessage(thread) {
+    : Actor(thread),
+      _udp(address),
+      _connected(thread),
+      _logs(thread),
+      _recv(thread),
+      _send(thread,10),
+      _incomingMessage(thread),
+      _outgoingMessage(thread) {
   _errorInvoker = new UdpSessionError(*this);
   _udp.address(address);
-  _send >> [&](const UdpMsg &um) { _udp.send(um); };
+  _send >> [&](const UdpMsg &um) {
+    _udp.send(um);
+  };
 }
 
 UdpAddress SessionUdp::address() { return _udp.address(); }

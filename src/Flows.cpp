@@ -9,7 +9,7 @@ Json cborToJson(const Bytes &frame) {
   CborValue root;
   Json json;
   json["error"] = "Failed";
-  // INFO("RXD[%d] %s", frame.size(), hexDump(frame).c_str());
+  // DEBUG("RXD[%d] %s", frame.size(), hexDump(frame).c_str());
   if (cbor_parser_init(frame.data(), frame.size(), 0, &decoder, &root) ==
       CborNoError) {
     if (cbor_value_to_json(out, &root, 0) == CborNoError) {
@@ -28,7 +28,7 @@ Json cborToJson(const Bytes &frame) {
 Flow<Bytes, Json> *cborToRequest() {
   return new Flow<Bytes, Json>([](Json &request, const Bytes &frame) {
     Json json = cborToJson(frame);
-    INFO("RXD : %s", json.toString().c_str());
+    DEBUG("RXD : %s", json.toString().c_str());
     if (json.is<JsonArray>()) {
       if (json[0] == "pub" && json[1].is<std::string>()) {
         if (json[2].is<JsonObject>()) {
@@ -104,7 +104,7 @@ Flow<Json, Bytes> *responseToCbor() {
         ser.begin().add("pub").add(topic).add(valueString).end();
       }
       frame = ser.toBytes();
-      INFO("TXD : %s", cborToJson(frame).toString().c_str());
+      DEBUG("TXD : %s", cborToJson(frame).toString().c_str());
       DEBUG("TXD : %s ", hexDump(ser.toBytes()).c_str());
       return true;
     }
@@ -132,9 +132,10 @@ Flow<Json, Bytes> *responseToBytes() {
   return new Flow<Json, Bytes>([](Bytes &msg, const Json &response) {
     std::string str;
     size_t sz = serializeJson(response, str);
-    INFO("TXD[%d] : '%s'", str.length(), str.c_str());
+    DEBUG("TXD[%d] : '%s'", str.length(), str.c_str());
     msg = Bytes(str.begin(), str.end());
-    return str.size() > 0;
+    DEBUG("TXD[%d] : %s", msg.size(), hexDump(msg).c_str());
+    return msg.size() > 0;
   });
 }
 
@@ -158,9 +159,10 @@ Flow<Json, std::string> *responseToString() {
       [](std::string &msg, const Json &response) {
         std::string str;
         size_t sz = serializeJson(response, str);
-        INFO("TXD[%d] : '%s'", str.length(), str.c_str());
+        DEBUG("TXD[%d] : '%s'", str.length(), str.c_str());
         msg = str;
-        return str.size() > 0;
+        DEBUG("TXD msg[%d] ", msg.length());
+        return msg.size() > 0;
       });
 }
 
@@ -174,6 +176,7 @@ Flow<Bytes, std::string> *bytesToString() {
 Flow<std::string, Bytes> *stringToBytes() {
   return new Flow<std::string, Bytes>([](Bytes &msg, const std::string &frame) {
     msg = Bytes(frame.data(), frame.data() + frame.size());
+    DEBUG("TXD[%d] : '%s'", msg.size(),hexDump(msg).c_str() );
     return msg.size() > 0;
   });
 }
@@ -220,7 +223,7 @@ Flow<Bytes, Json> *crlfCrcToRequest() {
     String payload = line.substr(0, line.size() - 4);
     String crc2 = crc16(payload);
     if (crc != crc2) {
-      INFO(" LOG : %s%s%s", ColorOrange, line.c_str(), ColorDefault);
+      DEBUG(" LOG : %s%s%s", ColorOrange, line.c_str(), ColorDefault);
       DEBUG("CRC MISMATCH %s != %s for %s ", crc.c_str(), crc2.c_str(),
             line.c_str());
       return false;
@@ -256,7 +259,7 @@ Flow<Bytes, Json> *crlfCrcToRequest() {
         return true;
       }
     };
-    INFO("RXD[%d] : %s%s%s", line.length(), ColorOrange, line.c_str(),
+    DEBUG("RXD[%d] : %s%s%s", line.length(), ColorOrange, line.c_str(),
          ColorDefault);
     return false;
   });

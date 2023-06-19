@@ -88,7 +88,7 @@ target_sources(udp2redis PRIVATE
 
 target_link_libraries(serial2redis 
     -lpthread  
-    -L../${HIREDIS} -l:libhiredis.a
+    -L../${HIREDIS}/build -l:libhiredis.a
     -L../${TINYCBOR}/lib -l:libtinycbor.a
     -lrt  
     -latomic)
@@ -97,14 +97,14 @@ target_link_libraries(ws2redis
     -lpthread  
     -L../${SEASOCKS_LDIR} -l:libseasocks.a
     -lz
-    -L../${HIREDIS} -l:libhiredis.a
+    -L../${HIREDIS}/build -l:libhiredis.a
     -L../${TINYCBOR}/lib -l:libtinycbor.a
     -lrt  
     -latomic)
 
 target_link_libraries(udp2redis 
     -lpthread  
-    -L../${HIREDIS} -l:libhiredis.a
+    -L../${HIREDIS}/build -l:libhiredis.a
     -L../${TINYCBOR}/lib -l:libtinycbor.a
     -lrt  
     -latomic)

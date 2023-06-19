@@ -26,8 +26,8 @@ void deepMerge(JsonVariant dst, JsonVariant src);
 
 //================================================================
 class RedisProxy : public Actor {
-  ValueFlow<Bytes> _toRedis;
-  ValueFlow<Bytes> _fromRedis;
+  QueueFlow<Bytes> _toRedis;
+  QueueFlow<Bytes> _fromRedis;
   bool _connected;
   Redis _redis;
   uint64_t _lastMessage;
@@ -74,8 +74,8 @@ int main(int argc, char **argv) {
 
   udpServer.recv() >> [&](const UdpMsg &udpMsg) {
     Bytes payload = udpMsg.payload;
-    DEBUG("UDP RXD %s => %s : %s", udpMsg.src.toString().c_str(),
-          udpMsg.dst.toString().c_str(), hexDump(payload).c_str());
+    INFO("UDP RXD %s => %s : %s", udpMsg.src.toString().c_str(),
+          udpMsg.dst.toString().c_str(), charDump(payload).c_str());
 
     UdpAddress udpSource = udpMsg.src;
     RedisProxy *redisProxy;
@@ -86,13 +86,15 @@ int main(int argc, char **argv) {
       redisProxy->fromRedis() >> [&, udpSource](const Bytes &bs) {
         UdpMsg msg{serverAddress, udpSource, bs};
         INFO("UDP TXD %s => %s : %s ", msg.src.toString().c_str(),
-             msg.dst.toString().c_str(), hexDump(msg.payload).c_str());
+             msg.dst.toString().c_str(), charDump(msg.payload).c_str());
         udpServer.send().on(msg);
       };
+      INFO(" New client %s ", udpSource.toString().c_str());
       auto res = clients.insert({udpSource, redisProxy});
       assert(res.second);
       redisProxy->connect();
     } else {
+      DEBUG(" Existing client %s ", udpSource.toString().c_str());
       redisProxy = it->second;
     }
     redisProxy->toRedis().on(payload);
@@ -126,11 +128,12 @@ RedisProxy::RedisProxy(Thread &thread, Json &config)
     : Actor(thread),
       _redis(thread, config["redis"].as<JsonObject>()),
       _lastMessage(0),
-      _toRedis(thread),
-      _fromRedis(thread) {
+      _toRedis(thread,10,"toRedis"),
+      _fromRedis(thread,10,"fromredis") {
   std::string format = config["udp"]["format"] | "json";
-  if (format == " json") {
-    _redis.response() >> *responseToString() >> *stringToBytes() >> _fromRedis;
+  if (format == "json") {
+    auto &fl = _redis.response() >> *responseToString();
+    fl >> *stringToBytes() >> _fromRedis;
     _toRedis >> *bytesToString() >> *stringToRequest() >> _redis.request();
     _toRedis >> *new SinkFunction<Bytes>(
                     [&](const Bytes &s) { _lastMessage = Sys::millis(); });
